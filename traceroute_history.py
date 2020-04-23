@@ -15,7 +15,7 @@ __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.1.0'
-__build__ = '2020042201'
+__build__ = '2020042301'
 
 # TODO: Use scappy as alternative internal traceroute implementation
 
@@ -35,6 +35,7 @@ import trparse
 from sql_declaration import Target, Traceroute, Group, init_db
 import configparser
 from contextlib import contextmanager
+from pprint import pprint
 
 # colorama is not mandatory
 try:
@@ -259,6 +260,18 @@ def get_last_traceroutes(name, limit=1):
         return last_trace
 
 
+def list_targets():
+    with session_scope() as session:
+        output = []
+        try:
+            targets = session.query(Target).all()
+            for target in targets:
+                output.append({'name': target.name, 'address': target.address, 'groups': target.groups})
+            return output
+        except sqlalchemy.orm.exc.NoResultFound:
+            return None
+
+
 def delete_old_traceroutes(name: str, days: int, keep: int):
     """
     Deletes old traceroute data if days have passed, but always keep at least limit entries
@@ -443,7 +456,8 @@ def load_database(host):
     """
     global DB_SESSION
     if not os.path.isfile(host):
-        raise FileNotFoundError('No database file: {0}'.format(host))
+        logger.critical('No database file: {0}. Please provide path in configuration file, or use --init-db to create a new database.'.format(host))
+        sys.exit(3)
     engine = create_engine('sqlite:///{0}'.format(host), echo=False)
     session_factory = sessionmaker(bind=engine)
     DB_SESSION = scoped_session(session_factory)
@@ -454,7 +468,7 @@ def help_():
     print('{} under {}'.format(__copyright__, __licence__))
     print('')
     print('Usage:')
-    print('{} [options]')
+    print('{} [options]'.format(__file__))
     print('')
     print('Options:')
     print('')
@@ -466,6 +480,7 @@ def help_():
     print('--update-now                         Manual update of traceroute targets')
     print(
         '--get-traceroutes-for=host[,x]       Print x traceroutes for target "host". If no x value is given, all are shown')
+    print('--list-targets                       Extract a list of current targets in database"')
     print('--init-db                            Initialize a fresh database.')
     sys.exit()
 
@@ -478,7 +493,8 @@ def main(argv):
 
     try:
         opts, _ = getopt.getopt(argv, "h?",
-                                ['config=', 'smokeping-config=', 'get-traceroutes-for=', 'daemon', 'update-now',
+                                ['config=', 'smokeping-config=', 'get-traceroutes-for=', 'list-targets',
+                                 'daemon', 'update-now',
                                  'init-db', 'help'])
     except getopt.GetoptError:
         help_()
@@ -506,11 +522,14 @@ def main(argv):
         if opt == '--init-db':
             db_engine = create_engine('sqlite:///{0}'.format(CONFIG['TRACEROUTE_HISTORY']['database_host']), echo=True)
             init_db(db_engine)
+            sys.exit(0)
 
     load_database(CONFIG['TRACEROUTE_HISTORY']['database_host'])
 
+    opt_found = False
     for opt, arg in opts:
         if opt == '--get-traceroutes-for':
+            opt_found = True
             try:
                 host, limit = arg.split(',')
                 limit = int(limit)
@@ -527,13 +546,22 @@ def main(argv):
                     print(traceroute)
             else:
                 print(traceroutes)
-            sys.exit()
+            sys.exit(0)
+        if opt == '--list-targets':
+            opt_found = True
+            pprint(list_targets())
+            sys.exit(0)
         if opt == '--daemon':
+            opt_found = True
             execute(daemon=True)
         if opt == '--update-now':
+            opt_found = True
             execute()
         if opt == '--help' or opt == 'h' or opt == '?':
+            opt_found = True
             help_()
+    if not opt_found:
+        help_()
 
 
 if __name__ == '__main__':
