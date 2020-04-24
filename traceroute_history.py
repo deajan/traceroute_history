@@ -538,12 +538,15 @@ def main(argv):
                 limit = None
             traceroutes = get_last_traceroutes(host, limit=limit)
             if traceroutes:
+                print('Target has {0} tracreoute entries.'.format(len(traceroutes)))
+                length = len(traceroutes)
                 if len(traceroutes) > 1:
                     print(traceroutes_difference_console(traceroutes[0], traceroutes[1]))
-                    for i in range(2):
-                        traceroutes.pop()
-                for traceroute in traceroutes:
-                    print(traceroute)
+                    for i in range(length - 2):
+                        print(traceroutes[i+2])
+                else:
+                    for traceroute in traceroutes:
+                        print(traceroute)
             else:
                 print(traceroutes)
             sys.exit(0)
