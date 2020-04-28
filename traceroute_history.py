@@ -140,10 +140,11 @@ def get_traceroute(address):
             executable = 'traceroute'
             encoding = 'utf-8'
         command = '{0} {1}'.format(executable, address)
-        exit_code, output = command_runner(command, shell=False, encoding=encoding)
+        exit_code, output = command_runner(command, shell=True, encoding=encoding)
         if exit_code == 0:
             return output
         else:
+            logger.error('Traceroute to address: {0} failed with exit code {1}. Command output:'.format(address, exit_code))
             logger.error(output)
     return None
 
@@ -500,9 +501,11 @@ def main(argv):
         help_()
         sys.exit(9)
 
+    config_file_set = False
     for opt, arg in opts:
         if opt == '--config':
             CONFIG_FILE = arg
+            config_file_set = True
         if opt == '--smokeping-config':
             SMOKEPING_CONFIG_FILE = arg
 
@@ -513,6 +516,9 @@ def main(argv):
         logger = ofunctions.logger_get_logger(log_file=log_file)
     except KeyError:
         pass
+
+    if not config_file_set:
+        logger.info('No config file set. trying default one: {0}.'.format(os.path.abspath(CONFIG_FILE)))
 
     if os.name != 'nt':
         if os.getuid() != 0:
