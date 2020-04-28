@@ -1,11 +1,13 @@
+#! /usr/bin/env python
+#  -*- coding: utf-8 -*-
 
-from sqlalchemy import create_engine
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
 Base = declarative_base()
+
 
 class Traceroute(Base):
     __tablename__ = 'traceroute'
@@ -42,12 +44,11 @@ class Target(Base):
     name = Column(String(255), unique=True, nullable=False)
     address = Column(String(255), nullable=True)
     traceroutes = relationship(Traceroute, backref='traceroutes')
-    groups = relationship(Traceroute, backref='groups' )
+    groups = relationship(Group, backref='groups')
 
     def __repr__(self):
-        return f'Target {self.name}: fqdn={self.fqdn}, ipv4={self.ipv4}, ipv6={self.ipv6}'
+        return f'Target {self.name}: address={self.address}'
 
 
 def init_db(db_engine):
     Base.metadata.create_all(db_engine)
-
