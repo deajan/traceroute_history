@@ -1,4 +1,4 @@
-#! /usr/bin/env python
+#! /usr/bin/env python3
 #  -*- coding: utf-8 -*-
 
 """
@@ -16,8 +16,6 @@ __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.1.0'
 __build__ = '2020042301'
-
-# TODO: Use scappy as alternative internal traceroute implementation
 
 import os
 import sys
@@ -528,6 +526,7 @@ def main(argv):
         if opt == '--init-db':
             db_engine = create_engine('sqlite:///{0}'.format(CONFIG['TRACEROUTE_HISTORY']['database_host']), echo=True)
             init_db(db_engine)
+            logger.info('DB engine initialization finished.')
             sys.exit(0)
 
     load_database(CONFIG['TRACEROUTE_HISTORY']['database_host'])
