@@ -279,10 +279,9 @@ def get_last_traceroutes_formatted(name, limit=1, format='console'):
                 output = output + traceroute.__repr__()
     else:
         output = traceroutes
-    if format == 'web':
-        return output.replace('\n', '<br />')
-    else:
-        return output
+    if format == 'web' and output is not None:
+        output = output.replace('\n', '<br />')
+    return output
 
 def list_targets():
     with session_scope() as session:
