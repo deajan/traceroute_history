@@ -259,6 +259,26 @@ def get_last_traceroutes(name, limit=1):
         return last_trace
 
 
+def get_last_traceroutes_formatted(name, limit=1, format='console'):
+    output = ''
+    traceroutes = get_last_traceroutes(name, limit=limit)
+    if traceroutes:
+        output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
+        length = len(traceroutes)
+        if len(traceroutes) > 1:
+            output = output + traceroutes_difference_console(traceroutes[0], traceroutes[1])
+            for i in range(length - 2):
+                output = output + traceroutes[i + 2].__repr__()
+        else:
+            for traceroute in traceroutes:
+                output = output + traceroute.__repr__()
+    else:
+        output = traceroutes
+    if format == 'web':
+        return output.replace('\n', '<br />')
+    else:
+        return output
+
 def list_targets():
     with session_scope() as session:
         output = []
@@ -541,19 +561,7 @@ def main(argv):
             except (ValueError, TypeError):
                 host = arg
                 limit = None
-            traceroutes = get_last_traceroutes(host, limit=limit)
-            if traceroutes:
-                print('Target has {0} tracreoute entries.'.format(len(traceroutes)))
-                length = len(traceroutes)
-                if len(traceroutes) > 1:
-                    print(traceroutes_difference_console(traceroutes[0], traceroutes[1]))
-                    for i in range(length - 2):
-                        print(traceroutes[i+2])
-                else:
-                    for traceroute in traceroutes:
-                        print(traceroute)
-            else:
-                print(traceroutes)
+            print(get_last_traceroutes_formatted(host, limit))
             sys.exit(0)
         if opt == '--list-targets':
             opt_found = True
