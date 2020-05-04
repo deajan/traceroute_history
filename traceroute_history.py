@@ -80,7 +80,7 @@ def diff_traceroutes(tr1: str, tr2: str):
     return different_hops
 
 
-def traceroutes_difference_formatted(tr1, tr2, format='console'):
+def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
     """
     Outputs traceroute differences with color highlighting in console
     :param tr1: (str) Traceroute sqlalchemy object
@@ -89,7 +89,7 @@ def traceroutes_difference_formatted(tr1, tr2, format='console'):
     """
     different_hops = diff_traceroutes(tr1.traceroute, tr2.traceroute)
 
-    if format == 'web':
+    if formatting == 'web':
         green_color = '<span class="traceroute-green" style="background-color: darkgreen; color:white">'
         red_color = '<span class="traceroute-red" style="background-color: darkred; color:white">'
         end_color = '</span>'
@@ -148,7 +148,8 @@ def get_traceroute(address):
         if exit_code == 0:
             return output
         else:
-            logger.error('Traceroute to address: {0} failed with exit code {1}. Command output:'.format(address, exit_code))
+            logger.error(
+                'Traceroute to address: "{0}" failed with exit code {1}. Command output:'.format(address, exit_code))
             logger.error(output)
     return None
 
@@ -266,7 +267,7 @@ def get_last_traceroutes(name, limit=1):
     return last_trace
 
 
-def get_last_traceroutes_formatted(name, limit=1, format='console'):
+def get_last_traceroutes_formatted(name, limit=1, formatting='console'):
     traceroutes = get_last_traceroutes(name, limit=limit)
     if traceroutes is False:
         logger.warning('Target {0} has been requested but does not exist in database.'.format(name))
@@ -275,7 +276,7 @@ def get_last_traceroutes_formatted(name, limit=1, format='console'):
         output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
         length = len(traceroutes)
         if len(traceroutes) > 1:
-            output = output + traceroutes_difference_formatted(traceroutes[0], traceroutes[1], format=format)
+            output = output + traceroutes_difference_formatted(traceroutes[0], traceroutes[1], formatting=formatting)
             for i in range(length - 2):
                 output = output + traceroutes[i + 2].__repr__()
         else:
@@ -283,7 +284,7 @@ def get_last_traceroutes_formatted(name, limit=1, format='console'):
                 output = output + traceroute.__repr__()
     else:
         output = traceroutes
-    if format == 'web' and output is not None and output != []:
+    if formatting == 'web' and output is not None and output != []:
         output = output.replace('\n', '<br />')
     return output
 
