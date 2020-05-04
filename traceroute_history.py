@@ -46,7 +46,8 @@ except ImportError:
 
 CONFIG_FILE = 'traceroute_history.conf'
 SMOKEPING_CONFIG_FILE = None
-DB_SESSION = None
+DB_SESSION_FACTORY = None
+DB_GLOBAL_READ_SESSION = None
 CONFIG = None
 
 LOG_FILE = os.path.join(os.path.dirname(__file__), os.path.splitext(os.path.basename(__file__))[0]) + '.log'
@@ -153,18 +154,18 @@ def get_traceroute(address):
 
 
 @contextmanager
-def session_scope():
+def db_scoped_session():
     """Provide a transactional scope around a series of operations."""
-    session = DB_SESSION()
+    session = DB_SESSION_FACTORY()
     try:
         yield session
         session.commit()
+        session.flush()
     except:
         session.rollback()
         raise
     finally:
-        #session.close() #WIP
-        pass
+        session.close()
 
 
 def insert_traceroute(target, traceroute_output):
@@ -176,7 +177,7 @@ def insert_traceroute(target, traceroute_output):
     :return:
     """
     traceroute = Traceroute(traceroute=traceroute_output, target=target)
-    with session_scope() as session:
+    with db_scoped_session() as session:
         session.add(traceroute)
 
 
@@ -198,7 +199,7 @@ def create_target(name, address=None, groups=None):
     #        group = db_session.query(Group).filter(Group.name == group).one()
 
     target = Target(name=name, address=address)
-    with session_scope() as session:
+    with db_scoped_session() as session:
         session.add(target)
 
     return target
@@ -215,7 +216,7 @@ def update_traceroute_database(name, address, groups):
     """
 
     try:
-        with session_scope() as session:
+        with db_scoped_session() as session:
             try:
                 target = session.query(Target).filter(Target.name == name).one()
             except sqlalchemy.orm.exc.NoResultFound:
@@ -253,19 +254,19 @@ def get_last_traceroutes(name, limit=1):
     :return: (list)(Traceroutes) list of traceroute object
 
     """
-    with session_scope() as session:
-        try:
-            target = session.query(Target).filter(Target.name == name).one()
-        except sqlalchemy.orm.exc.NoResultFound:
-            return None
+    # Let's use a single global read session which we won't close so ORM objects are still mapped to session after usage
+    session = DB_GLOBAL_READ_SESSION
+    try:
+        target = session.query(Target).filter(Target.name == name).one()
+    except sqlalchemy.orm.exc.NoResultFound:
+        return None
 
-        last_trace = session.query(Traceroute).filter(Traceroute.target == target).order_by(Traceroute.id.desc()).limit(
-            limit).all()
-        return last_trace
+    last_trace = session.query(Traceroute).filter(Traceroute.target == target).order_by(Traceroute.id.desc()).limit(
+        limit).all()
+    return last_trace
 
 
 def get_last_traceroutes_formatted(name, limit=1, format='console'):
-    output = ''
     traceroutes = get_last_traceroutes(name, limit=limit)
     if traceroutes:
         output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
@@ -284,7 +285,7 @@ def get_last_traceroutes_formatted(name, limit=1, format='console'):
     return output
 
 def list_targets():
-    with session_scope() as session:
+    with db_scoped_session() as session:
         output = []
         try:
             targets = session.query(Target).all()
@@ -305,7 +306,7 @@ def delete_old_traceroutes(name: str, days: int, keep: int):
     :return:
     """
 
-    with session_scope() as session:
+    with db_scoped_session() as session:
         try:
             target = session.query(Target).filter(Target.name == name).one()
         except sqlalchemy.orm.exc.NoResultFound:
@@ -477,13 +478,15 @@ def load_database(host):
 
     :return:
     """
-    global DB_SESSION
+    global DB_SESSION_FACTORY
+    global DB_GLOBAL_READ_SESSION
     if not os.path.isfile(host):
         logger.critical('No database file: {0}. Please provide path in configuration file, or use --init-db to create a new database.'.format(host))
         sys.exit(3)
     engine = create_engine('sqlite:///{0}'.format(host), echo=False)
     session_factory = sessionmaker(bind=engine)
-    DB_SESSION = scoped_session(session_factory)
+    DB_SESSION_FACTORY = scoped_session(session_factory)
+    DB_GLOBAL_READ_SESSION = DB_SESSION_FACTORY()
 
 
 def help_():
