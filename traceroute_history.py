@@ -89,9 +89,9 @@ def traceroutes_difference_formatted(tr1, tr2, format='console'):
     different_hops = diff_traceroutes(tr1.traceroute, tr2.traceroute)
 
     if format == 'web':
-        green_color = '<div class="traceroute-green"><span style="background-color: darkgreen; color:white">'
-        red_color = '<div class="traceroute-red"><span style="background-color: darkred; color:white">'
-        end_color = '</span></div>'
+        green_color = '<span class="traceroute-green" style="background-color: darkgreen; color:white">'
+        red_color = '<span class="traceroute-red" style="background-color: darkred; color:white">'
+        end_color = '</span>'
     else:
         try:
             green_color = colorama.Back.LIGHTGREEN_EX + colorama.Fore.BLACK
@@ -163,8 +163,8 @@ def session_scope():
         session.rollback()
         raise
     finally:
+        #session.close() #WIP
         pass
-        # session.close()
 
 
 def insert_traceroute(target, traceroute_output):
@@ -271,7 +271,7 @@ def get_last_traceroutes_formatted(name, limit=1, format='console'):
         output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
         length = len(traceroutes)
         if len(traceroutes) > 1:
-            output = output + traceroutes_difference_formatted(traceroutes[0], traceroutes[1])
+            output = output + traceroutes_difference_formatted(traceroutes[0], traceroutes[1], format=format)
             for i in range(length - 2):
                 output = output + traceroutes[i + 2].__repr__()
         else:
@@ -279,7 +279,7 @@ def get_last_traceroutes_formatted(name, limit=1, format='console'):
                 output = output + traceroute.__repr__()
     else:
         output = traceroutes
-    if format == 'web' and output is not None:
+    if format == 'web' and output is not None and output != []:
         output = output.replace('\n', '<br />')
     return output
 
