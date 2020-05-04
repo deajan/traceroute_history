@@ -79,7 +79,7 @@ def diff_traceroutes(tr1: str, tr2: str):
     return different_hops
 
 
-def traceroutes_difference_console(tr1, tr2):
+def traceroutes_difference_formatted(tr1, tr2, format='console'):
     """
     Outputs traceroute differences with color highlighting in console
     :param tr1: (str) Traceroute sqlalchemy object
@@ -87,6 +87,20 @@ def traceroutes_difference_console(tr1, tr2):
     :return: (str) diff colorred traceroute outputs
     """
     different_hops = diff_traceroutes(tr1.traceroute, tr2.traceroute)
+
+    if format == 'web':
+        green_color = '<div class="traceroute-green"><span style="background-color: darkgreen; color:white">'
+        red_color = '<div class="traceroute-red"><span style="background-color: darkred; color:white">'
+        end_color = '</span></div>'
+    else:
+        try:
+            green_color = colorama.Back.LIGHTGREEN_EX + colorama.Fore.BLACK
+            red_color = colorama.Back.LIGHTRED_EX + colorama.Fore.BLACK
+        except NameError:
+            # missing colorama module ?
+            green_color = '\033[102m'
+            red_color = '\033[101m'
+        end_color = '\033[0m'
 
     def _console_output(tr, color):
         console_output = ''
@@ -99,26 +113,17 @@ def traceroutes_difference_console(tr1, tr2):
                 console_output = '{0}{1}\n'.format(console_output, line)
                 continue
             if index in different_hops:
-                console_output = '{0}{1}{2}{3}\n'.format(console_output, color, line, '\033[0m')
+                console_output = '{0}{1}{2}{3}\n'.format(console_output, color, line, end_color)
             else:
                 console_output = '{0}{1}\n'.format(console_output, line)
         return console_output
 
-    try:
-        return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
-                                                                                         _console_output(tr1.traceroute,
-                                                                                                         colorama.Back.LIGHTGREEN_EX + colorama.Fore.BLACK),
-                                                                                         tr2.creation_date,
-                                                                                         _console_output(tr2.traceroute,
-                                                                                                         colorama.Back.LIGHTRED_EX + colorama.Fore.BLACK))
-    # NameError happens if colorama isn't loaded
-    except NameError:
-        return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
-                                                                                         _console_output(tr1.traceroute,
-                                                                                                         '\033[102m'),
-                                                                                         tr2.creation_date,
-                                                                                         _console_output(tr2.traceroute,
-                                                                                                         '\033[101m'))
+    return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
+                                                                                     _console_output(tr1.traceroute,
+                                                                                                     green_color),
+                                                                                     tr2.creation_date,
+                                                                                     _console_output(tr2.traceroute,
+                                                                                                     red_color))
 
 
 def get_traceroute(address):
@@ -266,7 +271,7 @@ def get_last_traceroutes_formatted(name, limit=1, format='console'):
         output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
         length = len(traceroutes)
         if len(traceroutes) > 1:
-            output = output + traceroutes_difference_console(traceroutes[0], traceroutes[1])
+            output = output + traceroutes_difference_formatted(traceroutes[0], traceroutes[1])
             for i in range(length - 2):
                 output = output + traceroutes[i + 2].__repr__()
         else:
