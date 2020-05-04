@@ -14,8 +14,8 @@ __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.1.0'
-__build__ = '2020042301'
+__version__ = '0.2.0'
+__build__ = '2020050401'
 
 import os
 import sys
@@ -34,11 +34,11 @@ from sql_declaration import Target, Traceroute, Group, init_db
 import configparser
 from contextlib import contextmanager
 from pprint import pprint
+import urllib.parse
 
 # colorama is not mandatory
 try:
     import colorama
-
     if os.name == 'nt':
         colorama.init(convert=True)
 except ImportError:
@@ -465,17 +465,13 @@ def load_config():
     config = configparser.ConfigParser()
     try:
         config.read(CONFIG_FILE)
-        if config['TRACEROUTE_HISTORY']['database_driver'] != 'sqlite3' and not os.path.isfile(
-                config['TRACEROUTE_HISTORY']['database_host']):
-            print('No valid sqlite configuration found.')
-            sys.exit(11)
     except (configparser.MissingSectionHeaderError, KeyError):
         print('Unknown database configuration.')
         sys.exit(12)
     return config
 
 
-def load_database(host):
+def load_database(db_driver=None, db_host=None, db_user=None, db_password=None, db_name=None, initialize=False):
     """
     Initiates database session as scoped session so we can reutilise the factory in a threaded model
 
@@ -483,13 +479,36 @@ def load_database(host):
     """
     global DB_SESSION_FACTORY
     global DB_GLOBAL_READ_SESSION
-    if not os.path.isfile(host):
-        logger.critical('No database file: {0}. Please provide path in configuration file, or use --init-db to create a new database.'.format(host))
+
+    if db_driver == 'sqlite' and not os.path.isfile(db_host) and initialize is False:
+        logger.critical('No database file: "{0}". Please provide path in configuration file, or use --init-db to create a new database.'.format(db_host))
         sys.exit(3)
-    engine = create_engine('sqlite:///{0}'.format(host), echo=False)
-    session_factory = sessionmaker(bind=engine)
-    DB_SESSION_FACTORY = scoped_session(session_factory)
-    DB_GLOBAL_READ_SESSION = DB_SESSION_FACTORY()
+
+    if db_driver == 'sqlite':
+        db_name = ''
+    elif db_name:
+        db_name = '/' + db_name
+
+    if db_user and db_password and db_driver != 'sqlite':
+        connection_string = '{0}:///{1}:{2}@{3}{4}'.format(db_driver, db_user, db_password, db_host, db_name)
+    else:
+        connection_string = '{0}:///{1}{2}'.format(db_driver, db_host, db_name)
+
+    print(connection_string)
+    if initialize:
+        db_engine = create_engine(connection_string, echo=True)
+        init_db(db_engine)
+        logger.info('DB engine initialization finished.')
+        sys.exit(0)
+    else:
+        try:
+            logger.info('Trying to open {0} database "{1}{2}" as user "{2}".'.format(db_driver, db_host, db_name, db_user, db_password))
+            engine = create_engine(connection_string, echo=False)
+            session_factory = sessionmaker(bind=engine)
+            DB_SESSION_FACTORY = scoped_session(session_factory)
+            DB_GLOBAL_READ_SESSION = DB_SESSION_FACTORY()
+        except sqlalchemy.exc.OperationalError:
+            logger.critical('Cannot connect to database "{0}".'.format(db_host), exc_info=True)
 
 
 def help_():
@@ -552,14 +571,28 @@ def main(argv):
         if os.getuid() != 0:
             logger.warn('This program should probably be run as root so traceroute can work.')
 
+    try:
+        db_user = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_user'])
+        db_password = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_password'])
+    except KeyError:
+        db_user = None
+        db_password = None
+    try:
+        db_name = CONFIG['TRACEROUTE_HISTORY']['database_name']
+    except KeyError:
+        db_name = None
+
+    initialize = False
     for opt, arg in opts:
         if opt == '--init-db':
-            db_engine = create_engine('sqlite:///{0}'.format(CONFIG['TRACEROUTE_HISTORY']['database_host']), echo=True)
-            init_db(db_engine)
-            logger.info('DB engine initialization finished.')
-            sys.exit(0)
+            initialize = True
 
-    load_database(CONFIG['TRACEROUTE_HISTORY']['database_host'])
+    load_database(db_driver=CONFIG['TRACEROUTE_HISTORY']['database_driver'],
+                  db_host=CONFIG['TRACEROUTE_HISTORY']['database_host'],
+                  db_name=db_name,
+                  db_user=db_user,
+                  db_password=db_password,
+                  initialize=initialize)
 
     opt_found = False
     for opt, arg in opts:
