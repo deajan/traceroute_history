@@ -35,6 +35,7 @@ import configparser
 from contextlib import contextmanager
 from pprint import pprint
 import urllib.parse
+from decimal import Decimal
 
 # colorama is not mandatory
 try:
@@ -54,30 +55,47 @@ LOG_FILE = os.path.join(os.path.dirname(__file__), os.path.splitext(os.path.base
 logger = ofunctions.logger_get_logger(log_file=LOG_FILE)
 
 
-def diff_traceroutes(tr1: str, tr2: str):
+def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_threshold: int=0):
     """
-    Checks whether two traceroute outputs are different, and returns list of different hops
+    Analyses two traceroutes for diffent hops, also checks for rtt increase
+    Returns list of different hops and increased rtt times
 
-    :param tr1: (str) raw traceeroute output
-    :param tr2: (str) raw
+    :param current_tr: (str) raw traceeroute output
+    :param previous_tr: (str) raw
     :return: (list)
     """
-    tr1_object = trparse.loads(tr1)
-    tr2_object = trparse.loads(tr2)
+    current_tr_object = trparse.loads(current_tr)
+    previous_tr_object = trparse.loads(previous_tr)
 
-    max_hops = max(len(tr1_object.hops), len(tr2_object.hops))
+    max_hops = max(len(current_tr_object.hops), len(previous_tr_object.hops))
 
     different_hops = []
+    increased_rtt = []
 
-    # Traceroute indexes begin with 1 instead of 0
     for index in range(max_hops):
-        try:
-            if not tr1_object.hops[index].probes[0].ip == tr2_object.hops[index].probes[0].ip:
-                different_hops.append(tr1_object.hops[index].idx)
-        except IndexError:
-            different_hops.append(tr1_object.hops[index].idx)
 
-    return different_hops
+        # Try to spot different hop hosts
+        try:
+            if not current_tr_object.hops[index].probes[0].ip == previous_tr_object.hops[index].probes[0].ip:
+                different_hops.append(current_tr_object.hops[index].idx)
+        except IndexError:
+            different_hops.append(current_tr_object.hops[index].idx)
+
+        # Try to spot increased rtt
+        if rtt_detection_threshold != 0:
+            try:
+                # Try to detect timeouts that did respond earlier
+                if current_tr_object.hops[index].probes[0].rtt is None and isinstance(previous_tr_object.hops[index].probes[0].rtt,
+                                                                               Decimal):
+                    increased_rtt.append(current_tr_object.hops[index].idx)
+                # Try to detect increses in rtt
+                elif current_tr_object.hops[index].probes[0].rtt > (
+                        previous_tr_object.hops[index].probes[0].rtt + rtt_detection_threshold):
+                    increased_rtt.append(current_tr_object.hops[index].idx)
+            except IndexError:
+                pass
+
+    return different_hops, increased_rtt
 
 
 def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
@@ -87,7 +105,15 @@ def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
     :param tr2: (str) Tracerouet sqlalchemy object
     :return: (str) diff colorred traceroute outputs
     """
-    different_hops = diff_traceroutes(tr1.traceroute, tr2.traceroute)
+
+    try:
+        rtt_detection_threshold = int(CONFIG['TRACEROUTE_HISTORY']['rtt_detection_threshold'])
+    except KeyError:
+        rtt_detection_threshold = 0
+    except TypeError:
+        logger.warning('Bogus rtt_detection_threshold value.')
+        rtt_detection_threshold = 0
+    different_hops, increased_rtt = analyze_traceroutes(tr1.traceroute, tr2.traceroute, rtt_detection_threshold=rtt_detection_threshold)
 
     if formatting == 'web':
         green_color = '<span class="traceroute-green" style="background-color: darkgreen; color:white">'
@@ -113,7 +139,7 @@ def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
             except (TypeError, IndexError, ValueError):
                 console_output = '{0}{1}\n'.format(console_output, line)
                 continue
-            if index in different_hops:
+            if index in different_hops or index in increased_rtt:
                 console_output = '{0}{1}{2}{3}\n'.format(console_output, color, line, end_color)
             else:
                 console_output = '{0}{1}\n'.format(console_output, line)
@@ -231,7 +257,15 @@ def update_traceroute_database(name, address, groups):
                 last_trace = session.query(Traceroute).filter(Traceroute.target == target).order_by(
                     Traceroute.id.desc()).first()
                 if last_trace:
-                    if diff_traceroutes(last_trace.traceroute, current_trace):
+                    try:
+                        rtt_detection_threshold = int(CONFIG['TRACEROUTE_HISTORY']['rtt_detection_threshold'])
+                    except KeyError:
+                        rtt_detection_threshold = 0
+                    except TypeError:
+                        logger.warning('Bogus rtt_detection_threshold value.')
+                        rtt_detection_threshold = 0
+                    different_hops, increased_rtt = analyze_traceroutes(last_trace.traceroute, current_trace, rtt_detection_threshold=rtt_detection_threshold)
+                    if different_hops or increased_rtt:
                         insert_traceroute(target, current_trace)
                         logger.info('Updating different traceroute for target: {0}.'.format(name))
                     else:
