@@ -259,7 +259,7 @@ def get_last_traceroutes(name, limit=1):
     try:
         target = session.query(Target).filter(Target.name == name).one()
     except sqlalchemy.orm.exc.NoResultFound:
-        return None
+        return False
 
     last_trace = session.query(Traceroute).filter(Traceroute.target == target).order_by(Traceroute.id.desc()).limit(
         limit).all()
@@ -268,6 +268,9 @@ def get_last_traceroutes(name, limit=1):
 
 def get_last_traceroutes_formatted(name, limit=1, format='console'):
     traceroutes = get_last_traceroutes(name, limit=limit)
+    if traceroutes is False:
+        logger.warning('Target {0} has been requested but does not exist in database.'.format(name))
+        return 'Target not found in database.'
     if traceroutes:
         output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
         length = len(traceroutes)
