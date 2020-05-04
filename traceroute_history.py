@@ -73,9 +73,9 @@ def diff_traceroutes(tr1: str, tr2: str):
     for index in range(max_hops):
         try:
             if not tr1_object.hops[index].probes[0].ip == tr2_object.hops[index].probes[0].ip:
-                different_hops.append(index)
+                different_hops.append(tr1_object.hops[index].idx)
         except IndexError:
-            different_hops.append(index)
+            different_hops.append(tr1_object.hops[index].idx)
 
     return different_hops
 
@@ -109,7 +109,7 @@ def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
             # Check that line is a hop, also, hops
             try:
                 # Since we count hop indexes from 0 in trparse, and hop output starts with 1
-                index = int(line.split()[0]) - 1
+                index = int(line.split()[0])
             except (TypeError, IndexError, ValueError):
                 console_output = '{0}{1}\n'.format(console_output, line)
                 continue
