@@ -11,16 +11,34 @@ Also happens to read smokeping configuration files to populate hosts to probe
 """
 
 import os
+import sys
+import getopt
 import cgi
 from flup.server.fcgi import WSGIServer
-#from traceroute_hisory import get_last_traceroutes
 #from traceroute_history.traceroute_history import get_last_traceroutes
+
+# Make sure we import traceroute_history module that resides in the same path as current fcgi script
+sys.path.append(os.path.join(os.path.dirname(__file__)))
 import traceroute_history
 
+GET = {}
+
+# Get command line variables for debugging purposes
+try:
+    opts, _ = getopt.getopt(sys.argv[1:], '', ['target=', 'limit='])
+    for opt, arg in opts:
+        if opt == '--target':
+            GET['target'] = arg
+        if opt == '--limit':
+            GET['limit'] = arg
+except getopt.GetoptError:
+    print('Invlid command line arguments given.')
+
 def app(environ, start_response):
+    global GET
+
     form = cgi.FieldStorage(environ['wsgi.input'], environ=environ)
 
-    GET = {}
     # Create dict GET for usual cgi scripts
     args=os.environ.get("QUERY_STRING", '').split('&')
     for arg in args:
@@ -39,11 +57,19 @@ def app(environ, start_response):
         start_response('404 OK', [('Content-Type', 'text/html')])
         return ('No target argument found')
 
+    try:
+        limit = GET['limit']
+    except KeyError:
+        limit = 5
 
-    traceroutes = traceroute_history.get_last_traceroutes(target)
-    start_response('200 OK', [('Content-Type', 'text/html')])
+    config = traceroute_history.load_config()
+    traceroute_history.load_database(config['TRACEROUTE_HISTORY']['database_host'])
+    traceroutes = traceroute_history.get_last_traceroutes_formatted(target, limit, format='web')
+    if traceroutes is not None:
+        start_response('200 OK', [('Content-Type', 'text/html')])
+        return ('{0}'.format(traceroutes))
 
-    return ('{0}'.format(traceroutes))
+    start_response('404 OK', [('Content-Type', 'text/html')])
+    return ('Target has no data.')
 
-#WSGIServer(app, bindAddress='/tmp/fcgi.sock').run()
 WSGIServer(app).run()
