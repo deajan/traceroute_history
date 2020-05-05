@@ -33,7 +33,7 @@ import trparse
 from sql_declaration import Target, Traceroute, Group, init_db
 import configparser
 from contextlib import contextmanager
-from pprint import pprint
+import json
 import urllib.parse
 from decimal import Decimal
 
@@ -171,13 +171,12 @@ def get_traceroute(address):
             encoding = 'utf-8'
         command = '{0} {1}'.format(executable, address)
         exit_code, output = command_runner(command, shell=True, encoding=encoding)
-        if exit_code == 0:
-            return output
-        else:
+        if exit_code != 0:
             logger.error(
                 'Traceroute to address: "{0}" failed with exit code {1}. Command output:'.format(address, exit_code))
             logger.error(output)
-    return None
+        return exit_code, output
+    return 1, 'Bogus address given.'
 
 
 @contextmanager
@@ -249,11 +248,10 @@ def update_traceroute_database(name, address, groups):
             except sqlalchemy.orm.exc.NoResultFound:
                 target = None
             if not target:
-                # miss ipv4 and others
                 target = create_target(name, address, groups)
                 logger.info('Created new target: {0}.'.format(name))
-            current_trace = get_traceroute(target.address)
-            if current_trace:
+            exit_code, current_trace = get_traceroute(target.address)
+            if exit_code == 0:
                 last_trace = session.query(Traceroute).filter(Traceroute.target == target).order_by(
                     Traceroute.id.desc()).first()
                 if last_trace:
@@ -275,6 +273,7 @@ def update_traceroute_database(name, address, groups):
                     logger.info('Created first tracreoute entry for target: {0}.'.format(name))
             else:
                 logger.error('Cannot get traceroute for target: {0}.'.format(name))
+                insert_traceroute(target, current_trace)
     except sqlalchemy.exc.OperationalError as exc:
         logger.error('sqlalchemy operation error: {0}.'.format(exc))
         logger.error('Trace:', exc_info=True)
@@ -322,13 +321,44 @@ def get_last_traceroutes_formatted(name, limit=1, formatting='console'):
         output = output.replace('\n', '<br />')
     return output
 
-def list_targets():
+
+def get_groups_from_config(name):
+    hosts = get_hosts_from_config()
+    for host in hosts:
+        try:
+            if CONFIG[host]['name'] == name:
+                return [group.strip() for group in CONFIG[host]['groups'].split(',')]
+        except KeyError:
+            return None
+
+
+def list_targets(include_tr: bool=False):
     with db_scoped_session() as session:
         output = []
         try:
             targets = session.query(Target).all()
             for target in targets:
-                output.append({'name': target.name, 'address': target.address, 'groups': target.groups})
+                groups = get_groups_from_config(target.name)
+                traces = get_last_traceroutes(target.name, limit=2)
+                try:
+                    current_tr = traces[0]
+                    current_tr_object = trparse.loads(current_tr.traceroute)
+                    current_rtt = int(current_tr_object.global_rtt)
+                except trparse.ParseError:
+                    current_rtt = None
+                try:
+                    previous_tr = traces[1]
+                    previous_tr_object = trparse.loads(previous_tr.traceroute)
+                    previous_rtt = int(previous_tr_object.global_rtt)
+                except (IndexError, trparse.ParseError):
+                    previous_rtt = None
+                target = {'id': target.id, 'name': target.name, 'address': target.address, 'groups': groups,
+                               'current_rtt': current_rtt, 'previous_rtt': previous_rtt,
+                               'last_check': current_tr.creation_date }
+                if include_tr:
+                    target['current_tr'] = current_tr.traceroute
+
+                output.append(target)
             return output
         except sqlalchemy.orm.exc.NoResultFound:
             return None
@@ -400,6 +430,19 @@ def read_smokeping_config(config_file):
     return [{'host': host, 'name': name} for host, name in zip(hosts, names)]
 
 
+def get_hosts_from_config():
+    hosts = [section for section in CONFIG.sections() if section.startswith('HOST_')]
+    try:
+        smokeping_config = CONFIG['SMOKEPING_SOURCE']['smokeping_config_path']
+    except KeyError:
+        smokeping_config = None
+    smokeping_hosts = read_smokeping_config(smokeping_config)
+    if smokeping_hosts:
+        hosts = hosts + smokeping_hosts
+
+    return hosts
+
+
 def execute(daemon=False):
     """
     Execute traceroute updates and housekeeping for all hosts
@@ -408,14 +451,7 @@ def execute(daemon=False):
     :return:
     """
     config = CONFIG
-    hosts = [section for section in config.sections() if section.startswith('HOST_')]
-    try:
-        smokeping_config = config['SMOKEPING_SOURCE']['smokeping_config_path']
-    except KeyError:
-        smokeping_config = None
-    smokeping_hosts = read_smokeping_config(smokeping_config)
-    if smokeping_hosts:
-        hosts = hosts + smokeping_hosts
+    hosts = get_hosts_from_config()
 
     if len(hosts) == 0:
         logger.info('No valid hosts given.')
@@ -493,6 +529,8 @@ def load_config():
 
     :return: (ConfigParser) config object
     """
+    global CONFIG
+
     if CONFIG_FILE is None or not os.path.isfile(CONFIG_FILE):
         print(
             'Cannot load configuration file: {0}. Please use --config=[config file].'.format(CONFIG_FILE))
@@ -503,10 +541,10 @@ def load_config():
     except (configparser.MissingSectionHeaderError, KeyError):
         print('Unknown database configuration.')
         sys.exit(12)
-    return config
+    CONFIG = config
 
 
-def load_database(db_driver=None, db_host=None, db_user=None, db_password=None, db_name=None, initialize=False):
+def load_database(initialize=False):
     """
     Initiates database session as scoped session so we can reutilise the factory in a threaded model
 
@@ -514,6 +552,21 @@ def load_database(db_driver=None, db_host=None, db_user=None, db_password=None, 
     """
     global DB_SESSION_FACTORY
     global DB_GLOBAL_READ_SESSION
+
+
+    db_driver = CONFIG['TRACEROUTE_HISTORY']['database_driver']
+    db_host = CONFIG['TRACEROUTE_HISTORY']['database_host']
+
+    try:
+        db_user = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_user'])
+        db_password = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_password'])
+    except KeyError:
+        db_user = None
+        db_password = None
+    try:
+        db_name = CONFIG['TRACEROUTE_HISTORY']['database_name']
+    except KeyError:
+        db_name = None
 
     if db_driver == 'sqlite' and not os.path.isfile(db_host) and initialize is False:
         logger.critical('No database file: "{0}". Please provide path in configuration file, or use --init-db to create a new database.'.format(db_host))
@@ -592,7 +645,7 @@ def main(argv):
             SMOKEPING_CONFIG_FILE = arg
 
     # Reload config before executing anything elsee
-    CONFIG = load_config()
+    load_config()
     try:
         log_file = CONFIG['TRACEROUTE_HISTORY']['log_file']
         logger = ofunctions.logger_get_logger(log_file=log_file)
@@ -606,28 +659,12 @@ def main(argv):
         if os.getuid() != 0:
             logger.warn('This program should probably be run as root so traceroute can work.')
 
-    try:
-        db_user = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_user'])
-        db_password = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_password'])
-    except KeyError:
-        db_user = None
-        db_password = None
-    try:
-        db_name = CONFIG['TRACEROUTE_HISTORY']['database_name']
-    except KeyError:
-        db_name = None
-
     initialize = False
     for opt, arg in opts:
         if opt == '--init-db':
             initialize = True
 
-    load_database(db_driver=CONFIG['TRACEROUTE_HISTORY']['database_driver'],
-                  db_host=CONFIG['TRACEROUTE_HISTORY']['database_host'],
-                  db_name=db_name,
-                  db_user=db_user,
-                  db_password=db_password,
-                  initialize=initialize)
+    load_database(initialize=initialize)
 
     opt_found = False
     for opt, arg in opts:
@@ -643,7 +680,7 @@ def main(argv):
             sys.exit(0)
         if opt == '--list-targets':
             opt_found = True
-            pprint(list_targets())
+            print(json.dumps(list_targets(), indent=2, sort_keys=True, default=str))
             sys.exit(0)
         if opt == '--daemon':
             opt_found = True
