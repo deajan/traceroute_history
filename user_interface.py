@@ -37,6 +37,7 @@ app = FastAPI()
 templates = Jinja2Templates(directory='templates')
 app.mount('/assets', StaticFiles(directory='assets'), name='assets')
 
+
 def get_system_data():
     try:
         cpu = psutil.cpu_percent()
@@ -54,13 +55,17 @@ def get_system_data():
         'ui_version': __version__
     }
 
+
 @app.get('/')
 async def index(request: Request):
-    return templates.TemplateResponse('targets.html', {'request': request, 'targets': targets, 'system': get_system_data()})
+    return templates.TemplateResponse('targets.html',
+                                      {'request': request, 'targets': targets, 'system': get_system_data()})
+
 
 @app.get('/delete/{id}')
 async def delete(request: Request):
     pass
+
 
 #def target_list
 #def target_info
