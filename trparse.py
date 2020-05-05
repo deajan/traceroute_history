@@ -96,8 +96,6 @@ class Probe(object):
         text = ""
         if self.asn is not None:
             text += "[AS{:d}] ".format(self.asn)
-        #if self.rtt:
-        #    text += "{:s} ({:s}) {:1.3f} ms".format(self.name, self.ip, self.rtt)
         if self.rtt:
             text += "{} ({}) {:1.3f} ms".format(self.name, self.ip, self.rtt)
         else:
@@ -139,7 +137,6 @@ def loads(data):
         if hop_index is not None:
             hop = Hop(hop_index)
             traceroute.add_hop(hop)
-
 
         hop_string = hop_match.group(2)
 
@@ -195,6 +192,7 @@ def load(data):
 
 class ParseError(Exception):
     pass
+
 
 class InvalidHeader(ParseError):
     pass
