@@ -3,3 +3,4 @@ SQLAlchemy>=1.3.16
 flup[fcgi]>=1.0.3
 fastapi[ui]>=0.5.4
 uvicorn[ui]>=0.11.3
+psutil[ui]>=5.7.0
