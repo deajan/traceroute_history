@@ -1,0 +1,177 @@
+            <!--
+          ====================================
+          ——— LEFT SIDEBAR WITH FOOTER
+          =====================================
+        -->
+        <aside class="left-sidebar bg-sidebar">
+          <div id="sidebar" class="sidebar sidebar-with-footer">
+            <!-- Aplication Brand -->
+            <div class="app-brand">
+              <a href="/" title="Traceroute History">
+                <svg
+                  class="brand-icon"
+                  xmlns="http://www.w3.org/2000/svg"
+                  preserveAspectRatio="xMidYMid"
+                  width="30"
+                  height="33"
+                  viewBox="0 0 30 33"
+                >
+                  <g fill="none" fill-rule="evenodd">
+                    <path
+                      class="logo-fill-blue"
+                      fill="#7DBCFF"
+                      d="M0 4v25l8 4V0zM22 4v25l8 4V0z"
+                    />
+                    <path class="logo-fill-white" fill="#FFF" d="M11 4v25l8 4V0z" />
+                  </g>
+                </svg>
+                <span class="brand-name text-truncate">Traceroute History</span>
+              </a>
+            </div>
+            <!-- begin sidebar scrollbar -->
+            <div class="sidebar-scrollbar">
+
+              <!-- sidebar menu -->
+              <ul class="nav sidebar-inner" id="sidebar-menu">
+                
+
+                
+                  <li  class="has-sub" >
+                    <a class="sidenav-item-link" href="javascript:void(0)" data-toggle="collapse" data-target="#dashboard"
+                      aria-expanded="false" aria-controls="dashboard">
+                      <i class="mdi mdi-view-dashboard-outline"></i>
+                      <span class="nav-text">Targets</span> <b class="caret"></b>
+                    </a>
+                    <ul  class="collapse"  id="dashboard"
+                      data-parent="#sidebar-menu">
+                      <div class="sub-menu">
+                        
+                        
+                          
+                            <li >
+                              <a class="sidenav-item-link" href="/new">
+                                <span class="nav-text">New Target</span>
+                                
+                              </a>
+                            </li>
+                          
+                        
+
+                        
+                        
+                          
+                            <li >
+                              <a class="sidenav-item-link" href="banalytics.html">
+                                <span class="nav-text">zffz</span>
+                                
+                                <span class="badge badge-success">new</span>
+                                
+                              </a>
+                            </li>
+                          
+                        
+
+                        
+                      </div>
+                    </ul>
+                  </li>
+                
+
+                
+
+                
+                  <li  class="has-sub" >
+                    <a class="sidenav-item-link" href="javascript:void(0)" data-toggle="collapse" data-target="#app"
+                      aria-expanded="false" aria-controls="app">
+                      <i class="mdi mdi-pencil-box-multiple"></i>
+                      <span class="nav-text">Service control</span> <b class="caret"></b>
+                    </a>
+                    <ul  class="collapse"  id="app"
+                      data-parent="#sidebar-menu">
+                      <div class="sub-menu">
+                        
+                        
+                          
+                            <li >
+                              <a class="sidenav-item-link" href="chat.html">
+                                <span class="nav-text">Chat</span>
+                                
+                              </a>
+                            </li>
+                          
+                        
+
+                        
+                        
+                          
+                            <li >
+                              <a class="sidenav-item-link" href="contacts.html">
+                                <span class="nav-text">Contacts</span>
+                                
+                              </a>
+                            </li>
+                          
+                        
+
+                        
+                        
+                          
+                            <li >
+                              <a class="sidenav-item-link" href="team.html">
+                                <span class="nav-text">Team</span>
+                                
+                              </a>
+                            </li>
+                          
+                        
+
+                        
+                        
+                          
+                            <li >
+                              <a class="sidenav-item-link" href="calendar.html">
+                                <span class="nav-text">Calendar</span>
+                                
+                              </a>
+                            </li>
+                          
+                        
+
+                        
+                      </div>
+                    </ul>
+                  </li>
+
+              </ul>
+
+            </div>
+
+            <div class="sidebar-footer">
+              <hr class="separator mb-0" />
+			  <div class="d-flex align-content-center"><span class="mdi mdi-desktop-tower mdi-48px"></span></div>
+              <div class="sidebar-footer-content">
+                <h6 class="text-uppercase">
+                  Cpu usage <span class="float-right">{{ system.cpu }}%</span>
+                </h6>
+                <div class="progress progress-xs">
+                  <div
+                    class="progress-bar active"
+                    style="width: {{ system.cpu }}%;"
+                    role="progressbar"
+                  ></div>
+                </div>
+                <h6 class="text-uppercase">
+                  Memory usage <span class="float-right">{{ system.memory }}%</span>
+                </h6>
+                <div class="progress progress-xs">
+                  <div
+                    class="progress-bar progress-bar-warning"
+                    style="width: {{ system.memory }}%;"
+                    role="progressbar"
+                  ></div>
+                </div>
+			    Core v {{ system.version }} - UI v {{ system.ui_version }}
+              </div>
+            </div>
+          </div>
+        </aside>
