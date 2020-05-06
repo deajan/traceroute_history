@@ -14,8 +14,8 @@ __intname__ = 'traceroute_history.user_interface'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.1.0'
-__build__ = '2020050501'
+__version__ = '0.2.0'
+__build__ = '2020050601'
 
 from fastapi import FastAPI, Request
 import uvicorn
@@ -30,7 +30,7 @@ logger = ofunctions.logger_get_logger()
 
 traceroute_history.load_config()
 traceroute_history.load_database()
-targets = traceroute_history.list_targets(include_tr=True)
+targets = traceroute_history.list_targets(include_tr=True, formatting='web')
 
 
 app = FastAPI()
