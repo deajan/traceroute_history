@@ -5,8 +5,8 @@
 traceroute_history is a quick tool to make traceroute / tracert calls, and store it's results into a database if it
 differs from last call.
 
-Hosts can be configured in a config file,
-Also happens to read smokeping configuration files to populate hosts to probe
+Targets can be configured in a config file,
+Also happens to read smokeping configuration files to populate targets to probe
 
 """
 
@@ -201,9 +201,9 @@ def create_group(name, target):
 
 def create_target(name, address=None, groups=None):
     """
-    Creates new target (host) to monitor in DB
+    Creates new target to monitor in DB
 
-    :param name: (str) host user friendly name (can be anything)
+    :param name: (str) target user friendly name (can be anything)
     :param address: (str) hostname in fqdn, ipv4 or ipv6 format
     :param groups: (list)(str) list of groups to which this target belongs
     :return: (Target) target object
@@ -223,7 +223,7 @@ def update_traceroute_database(name, address, groups):
     """
     Executes tracert for given name, and updates database accordingly
 
-    :param name: (str) host user friendly name (can be anything)
+    :param name: (str) target user friendly name (can be anything)
     :param address: (str) hostname in fqdn, ipv4 or ipv6 format
     :param groups: (list)(str) list of groups to which this target belongs
     :return:
@@ -340,11 +340,11 @@ def format_string(string: str, formatting: str='console'):
 
 
 def get_groups_from_config(name):
-    hosts = get_hosts_from_config()
-    for host in hosts:
+    targets = get_targets_from_config()
+    for target in targets:
         try:
-            if host.lstrip('HOST_') == name:
-                return [group.strip() for group in CONFIG[host]['groups'].split(',')]
+            if target.lstrip('TARGET:') == name:
+                return [group.strip() for group in CONFIG[target]['groups'].split(',')]
         except KeyError:
             return None
 
@@ -418,10 +418,10 @@ def delete_old_traceroutes(name: str, days: int, keep: int):
 def read_smokeping_config(config_file):
     """
     Read smokeping config file
-    TODO: does not support missing title or host directives (will shift values)
+    TODO: does not support missing title or target directives (will shift values)
 
     :param config_file: (str) path to config file
-    :return: (list)(dict) [{'host': x, 'title': y}]
+    :return: (list)(dict) [{'target': x, 'title': y}]
     """
     if config_file == '':
         return None
@@ -429,56 +429,58 @@ def read_smokeping_config(config_file):
         logger.error('smokeping config "{0}" does not seem to be a file.'.format(config_file))
         return None
 
-    host_regex = re.compile(r'^host\s*=\s*(\S*)$')
+    target_regex = re.compile(r'^host\s*=\s*(\S*)$')
     title_regex = re.compile(r'^title\s*=\s*(.*)$')
 
-    hosts = []
+    targets = []
     names = []
 
     with open(config_file, 'r') as smokeping_config:
         for line in smokeping_config:
-            host = re.match(host_regex, line)
+            target = re.match(target_regex, line)
             name = re.match(title_regex, line)
-            if host:
-                hosts.append(host)
+            if target:
+                targets.append(target)
             if name:
-                names.append(host)
+                names.append(target)
 
-    if len(hosts) != len(names):
+    if len(targets) != len(names):
         logger.error('Cannot parse smokeping config file. We need as much titles as host entries.')
         return None
 
     # TODO Add regex for group inclusion / exclusion
 
-    return [{'host': host, 'name': name} for host, name in zip(hosts, names)]
+    return [{'target': target, 'name': name} for target, name in zip(targets, names)]
 
 
-def get_hosts_from_config():
-    hosts = [section for section in CONFIG.sections() if section.startswith('HOST_')]
+def get_targets_from_config():
+    targets = [section.lstrip('TARGET:') for section in CONFIG.sections() if section.startswith('TARGET:')]
     try:
         smokeping_config = CONFIG['SMOKEPING_SOURCE']['smokeping_config_path']
     except KeyError:
         smokeping_config = None
-    smokeping_hosts = read_smokeping_config(smokeping_config)
-    if smokeping_hosts:
-        hosts = hosts + smokeping_hosts
+    smokeping_targets = read_smokeping_config(smokeping_config)
+    if smokeping_targets:
+        targets = targets + smokeping_targets
 
-    print(hosts)
-    return hosts
+    print(targets)
+    return targets
+
+
 
 
 def execute(daemon=False):
     """
-    Execute traceroute updates and housekeeping for all hosts
+    Execute traceroute updates and housekeeping for all targets
 
     :param daemon: (bool) Should this run in a loop
     :return:
     """
     config = CONFIG
-    hosts = get_hosts_from_config()
+    targets = get_targets_from_config()
 
-    if len(hosts) == 0:
-        logger.info('No valid hosts given.')
+    if len(targets) == 0:
+        logger.info('No valid targets given.')
         sys.exit(20)
 
     scheduler = BackgroundScheduler()
@@ -508,13 +510,13 @@ def execute(daemon=False):
         logger.error('Bogus minimum_keep value. Using default.')
         minimum_keep = 100
 
-    for host in hosts:
+    for target in targets:
         try:
-            target_name = host.lstrip('HOST_')
+            target_name = target
             job_kwargs = {
                 'name': target_name,
-                'address': config[host]['address'],
-                'groups': config[host]['groups']
+                'address': config['TARGET:' + target]['address'],
+                'groups': config['TARGET:' + target]['groups']
             }
             delete_kwargs = {
                 'name': target_name,
@@ -535,7 +537,7 @@ def execute(daemon=False):
                 scheduler.add_job(delete_old_traceroutes, 'interval', [], delete_kwargs, hours=1,
                                   name='housekeeping-' + target_name, id='housekeeping-' + target_name)
         except KeyError as exc:
-            logger.error('Failed to read configuration for host "{0}": {1}.'.format(host, exc))
+            logger.error('Failed to read configuration for target "{0}": {1}.'.format(target, exc), exc_info=True)
 
     run_once = True
     try:
@@ -658,7 +660,7 @@ def help_():
     print('--daemon                             Run as daemon')
     print('--update-now                         Manual update of traceroute targets')
     print(
-        '--get-traceroutes-for=host[,x]       Print x traceroutes for target "host". If no x value is given, all are shown')
+        '--get-traceroutes-for=name[,x]       Print x traceroutes for target "name". If no x value is given, all are shown')
     print('--list-targets                       Extract a list of current targets in database"')
     print('--init-db                            Initialize a fresh database.')
     sys.exit()
@@ -714,12 +716,12 @@ def main(argv):
         if opt == '--get-traceroutes-for':
             opt_found = True
             try:
-                host, limit = arg.split(',')
+                target, limit = arg.split(',')
                 limit = int(limit)
             except (ValueError, TypeError):
-                host = arg
+                target = arg
                 limit = None
-            print(get_last_traceroutes_formatted(host, limit))
+            print(get_last_traceroutes_formatted(target, limit))
             sys.exit(0)
         if opt == '--list-targets':
             opt_found = True
