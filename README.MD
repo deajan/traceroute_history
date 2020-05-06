@@ -1,5 +1,7 @@
 # Traceroute History
 
+Traceroute History is under heavy developpment (see TODO.TXT).
+
 Traceroute History records Unix traceroute & Windows tracert outputs to a database, upon host changes in hops, or big rtt increases to hops.
 The core can be run as a service or as a cron task, both providing regular probe updates.
 It can be run via cron / task scheduler or as service.
@@ -26,6 +28,7 @@ CLI can be executed directly via the script, eg:
 GUI relies on FastAPI and uvicorn modules.
 GUI can be launched via `user_interface.py` and will by default listen on 127.0.0.1:5001
 
+![Test Image 1](current_ui_state.png)
    
 ## Smokeping integration
 
