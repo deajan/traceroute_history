@@ -62,9 +62,10 @@ async def index(request: Request):
                                       {'request': request, 'targets': targets, 'system': get_system_data()})
 
 
-@app.get('/delete/{id}')
-async def delete(request: Request):
-    pass
+@app.get('/delete/{name}')
+async def delete(name):
+    traceroute_history.remove_target(name)
+    return 'Id={}'.format(name)
 
 
 #def target_list
