@@ -253,14 +253,14 @@ def update_traceroute_database(name, address, groups):
                     different_hops, increased_rtt = analyze_traceroutes(last_trace.traceroute, current_trace, rtt_detection_threshold=rtt_detection_threshold)
                     if different_hops or increased_rtt:
                         insert_traceroute(target, current_trace)
-                        logger.info('Updating different traceroute for target: {0}.'.format(name))
+                        logger.info('Updating different traceroute for target "{0}".'.format(name))
                     else:
-                        logger.debug('Traceroute identical to last one for target: {0}. Nothing to do.'.format(name))
+                        logger.debug('Traceroute identical to last one for target "{0}". Nothing to do.'.format(name))
                 else:
                     insert_traceroute(target, current_trace)
-                    logger.info('Created first tracreoute entry for target: {0}.'.format(name))
+                    logger.info('Created first tracreoute entry for target "{0}".'.format(name))
             else:
-                logger.error('Cannot get traceroute for target: {0}.'.format(name))
+                logger.error('Cannot get traceroute for target "{0}".'.format(name))
                 insert_traceroute(target, current_trace)
     except sqlalchemy.exc.OperationalError as exc:
         logger.error('sqlalchemy operation error: {0}.'.format(exc))
@@ -412,7 +412,7 @@ def delete_old_traceroutes(name: str, days: int, keep: int):
                                                                     days=days)))).order_by(Traceroute.id.desc()).limit(
                 num_records_to_delete).subquery()
             records = session.query(Traceroute).filter(Traceroute.id.in_(subquery)).delete(synchronize_session='fetch')
-            logger.info('Deleted {0} old records for target: {1}.'.format(records, name))
+            logger.info('Deleted {0} old records for target "{1}".'.format(records, name))
 
 
 def read_smokeping_config(config_file):
@@ -534,7 +534,7 @@ def execute(daemon=False):
                 scheduler.add_job(delete_old_traceroutes, 'interval', [], delete_kwargs, hours=1,
                                   name='housekeeping-' + target_name, id='housekeeping-' + target_name)
         except KeyError as exc:
-            logger.error('Failed to read configuration for host: {0}: {1}.'.format(host, exc))
+            logger.error('Failed to read configuration for host "{0}": {1}.'.format(host, exc))
 
     run_once = True
     try:
@@ -556,7 +556,7 @@ def load_config():
 
     if CONFIG_FILE is None or not os.path.isfile(CONFIG_FILE):
         print(
-            'Cannot load configuration file: {0}. Please use --config=[config file].'.format(CONFIG_FILE))
+            'Cannot load configuration file "{0}". Please use --config=[config file].'.format(CONFIG_FILE))
         sys.exit(10)
     config = configparser.ConfigParser()
     try:
@@ -605,7 +605,7 @@ def load_database(initialize=False):
     else:
         connection_string = '{0}:///{1}{2}'.format(db_driver, db_host, db_name)
 
-    print(connection_string)
+    logger.debug('SQL Connection string "{0}".'.format(connection_string))
     if initialize:
         db_engine = create_engine(connection_string, echo=True)
         init_db(db_engine)
