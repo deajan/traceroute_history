@@ -343,7 +343,7 @@ def get_groups_from_config(name):
     hosts = get_hosts_from_config()
     for host in hosts:
         try:
-            if CONFIG[host]['name'] == name:
+            if host.lstrip('HOST_') == name:
                 return [group.strip() for group in CONFIG[host]['groups'].split(',')]
         except KeyError:
             return None
@@ -463,6 +463,7 @@ def get_hosts_from_config():
     if smokeping_hosts:
         hosts = hosts + smokeping_hosts
 
+    print(hosts)
     return hosts
 
 
@@ -509,14 +510,14 @@ def execute(daemon=False):
 
     for host in hosts:
         try:
-            target_name = config[host]['name']
+            target_name = host.lstrip('HOST_')
             job_kwargs = {
-                'name': config[host]['name'],
+                'name': target_name,
                 'address': config[host]['address'],
                 'groups': config[host]['groups']
             }
             delete_kwargs = {
-                'name': config[host]['name'],
+                'name': target_name,
                 'days': delete_history_days,
                 'keep': minimum_keep
             }
@@ -565,6 +566,25 @@ def load_config():
         print('Unknown database configuration.')
         sys.exit(12)
     CONFIG = config
+
+
+def save_config():
+    """
+    Saves config to file
+
+    :return: (bool)
+    """
+
+    if CONFIG_FILE is None or not os.path.isfile(CONFIG_FILE):
+        logger.error('Cannot save configuration file "{0}".'.format(CONFIG_FILE))
+
+    try:
+        with open(CONFIG_FILE, 'w') as fp:
+            CONFIG.write(fp)
+            return True
+    except OSError as exc:
+        logger.critical('Cannot save configuration file. {}'.format(exc))
+        return False
 
 
 def load_database(initialize=False):
