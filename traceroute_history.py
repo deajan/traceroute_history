@@ -14,8 +14,8 @@ __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.2.0'
-__build__ = '2020050401'
+__version__ = '0.3.0'
+__build__ = '2020050601'
 
 import os
 import sys
@@ -92,13 +92,13 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
                 elif current_tr_object.hops[index].probes[0].rtt > (
                         previous_tr_object.hops[index].probes[0].rtt + rtt_detection_threshold):
                     increased_rtt.append(current_tr_object.hops[index].idx)
-            except IndexError:
+            except (IndexError, TypeError):
                 pass
 
     return different_hops, increased_rtt
 
 
-def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
+def traceroutes_difference_preformatted(tr1, tr2):
     """
     Outputs traceroute differences with color highlighting in console
     :param tr1: (str) Traceroute sqlalchemy object
@@ -115,19 +115,7 @@ def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
         rtt_detection_threshold = 0
     different_hops, increased_rtt = analyze_traceroutes(tr1.traceroute, tr2.traceroute, rtt_detection_threshold=rtt_detection_threshold)
 
-    if formatting == 'web':
-        green_color = '<span class="traceroute-green" style="background-color: darkgreen; color:white">'
-        red_color = '<span class="traceroute-red" style="background-color: darkred; color:white">'
-        end_color = '</span>'
-    else:
-        try:
-            green_color = colorama.Back.LIGHTGREEN_EX + colorama.Fore.BLACK
-            red_color = colorama.Back.LIGHTRED_EX + colorama.Fore.BLACK
-        except NameError:
-            # missing colorama module ?
-            green_color = '\033[102m'
-            red_color = '\033[101m'
-        end_color = '\033[0m'
+
 
     def _console_output(tr, color):
         console_output = ''
@@ -140,17 +128,17 @@ def traceroutes_difference_formatted(tr1, tr2, formatting='console'):
                 console_output = '{0}{1}\n'.format(console_output, line)
                 continue
             if index in different_hops or index in increased_rtt:
-                console_output = '{0}{1}{2}{3}\n'.format(console_output, color, line, end_color)
+                console_output = '{0}{1}{2}{3}\n'.format(console_output, color, line, '{% END_COLOR %}')
             else:
                 console_output = '{0}{1}\n'.format(console_output, line)
         return console_output
 
     return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
                                                                                      _console_output(tr1.traceroute,
-                                                                                                     green_color),
+                                                                                                     '{% START_COLOR_GREEN %}'),
                                                                                      tr2.creation_date,
                                                                                      _console_output(tr2.traceroute,
-                                                                                                     red_color))
+                                                                                                     '{% START_COLOR_RED %}'))
 
 
 def get_traceroute(address):
@@ -309,7 +297,7 @@ def get_last_traceroutes_formatted(name, limit=1, formatting='console'):
         output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
         length = len(traceroutes)
         if len(traceroutes) > 1:
-            output = output + traceroutes_difference_formatted(traceroutes[0], traceroutes[1], formatting=formatting)
+            output = output + traceroutes_difference_preformatted(traceroutes[0], traceroutes[1])
             for i in range(length - 2):
                 output = output + traceroutes[i + 2].__repr__()
         else:
@@ -317,9 +305,38 @@ def get_last_traceroutes_formatted(name, limit=1, formatting='console'):
                 output = output + traceroute.__repr__()
     else:
         output = traceroutes
-    if formatting == 'web' and output is not None and output != []:
-        output = output.replace('\n', '<br />')
-    return output
+
+    return format_string(output, formatting)
+
+
+def format_string(string: str, formatting: str='console'):
+    if string is None or string is []:
+        return string
+
+    if formatting == 'web':
+        green_color = '<span class="green traceroute-green" style="background-color: darkgreen; color:white">'
+        red_color = '<span class="red traceroute-red" style="background-color: darkred; color:white">'
+        end_color = '</span>'
+    elif formatting == 'console':
+        try:
+            green_color = colorama.Back.LIGHTGREEN_EX + colorama.Fore.BLACK
+            red_color = colorama.Back.LIGHTRED_EX + colorama.Fore.BLACK
+        except NameError:
+            # missing colorama module ?
+            green_color = '\033[102m'
+            red_color = '\033[101m'
+        end_color = '\033[0m'
+    else:
+        green_color = red_color = end_color = ''
+
+    string = string.replace('{% START_COLOR_GREEN %}', green_color)
+    string = string.replace('{% START_COLOR_RED %}', red_color)
+    string = string.replace('{% END_COLOR %}', end_color)
+
+    if formatting == 'web':
+        return string.replace('\n', '<br />')
+    else:
+        return string
 
 
 def get_groups_from_config(name):
@@ -332,7 +349,7 @@ def get_groups_from_config(name):
             return None
 
 
-def list_targets(include_tr: bool=False):
+def list_targets(include_tr: bool=False, formatting: str='console'):
     with db_scoped_session() as session:
         output = []
         try:
@@ -351,12 +368,18 @@ def list_targets(include_tr: bool=False):
                     previous_tr_object = trparse.loads(previous_tr.traceroute)
                     previous_rtt = int(previous_tr_object.global_rtt)
                 except (IndexError, trparse.ParseError):
+                    previous_tr = None
                     previous_rtt = None
+
                 target = {'id': target.id, 'name': target.name, 'address': target.address, 'groups': groups,
                                'current_rtt': current_rtt, 'previous_rtt': previous_rtt,
                                'last_check': current_tr.creation_date }
                 if include_tr:
-                    target['current_tr'] = current_tr.traceroute
+                    if previous_tr:
+                        target['current_tr'] = format_string(traceroutes_difference_preformatted(current_tr, previous_tr), formatting)
+                    else:
+                        target['current_tr'] = format_string(current_tr.traceroute, formatting)
+
 
                 output.append(target)
             return output
