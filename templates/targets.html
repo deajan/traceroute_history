@@ -5,9 +5,6 @@
 										<div class="card-header card-header-border-bottom d-flex justify-content-between">
 											<h2>Traceroute target list</h2>
 
-											<a href="https://datatables.net/extensions/rowreorder/examples/initialisation/responsive.html" target="_blank" class="btn btn-outline-primary btn-sm text-uppercase">
-												<i class=" mdi mdi-link mr-1"></i> Docs
-											</a>
 										</div>
 
 										<div class="card-body">
@@ -29,18 +26,18 @@
 													    {% for target in targets %}
 														<tr>
 															<td class="text-left align-middle">{{ target.name }}</td>
-															<td class="align-middle">{% if target.current_rtt %}<a href="" class="btn btn-success btn-circle"><i class="fas fa-check"></i>{{ target.address }}</a>
-															{% else %}<a href="" class="btn btn-danger btn-circle"><i class="fas fa-check"></i>{{ target.address }}</a>
+															<td class="align-middle">{% if target.current_rtt %}<button class="btn btn-success btn-circle">{{ target.address }}</button>
+															{% else %}<button class="btn btn-danger btn-circle">{{ target.address }}</button>
 															{% endif %}</td>
 															<td class="align-middle">{% if target.groups %}
 																	{% for group in target.groups %}
-																		<a href="" class="btn btn-warning btn-circle"><i class="fas fa-check"></i>{{ group }}</a>
+																		<button class="btn btn-warning btn-circle">{{ group }}</button>
 																	{% endfor %}
 																{% endif %}</td>
-															<td class="align-middle">{% if target.last_check %}<button href="#" class="btn"><i class=""></i>{{ target.last_check }}</a>{% endif %}</td>
+															<td class="align-middle">{% if target.last_check %}<button href="#" class="btn" data-toggle="modal" data-target="#genericModel" data-modaltype="info" data-info="{{ target.current_tr }}"><i class=""></i>{{ target.last_check }}</button>{% endif %}</td>
 															<td class="align-middle">{{ target.current_rtt }}</td>
 															<td class="align-middle">{{ target.previous_rtt }}</td>
-															<td class="align-middle"><button type="button" data-toggle="modal" data-target="#deleteModal" data-id="{{ target.id }}" class="btn btn-danger"><i class="mdi mdi-16px mdi-delete"></i></a></td>
+															<td class="align-middle"><button type="button" data-toggle="modal" data-target="#genericModel" data-modaltype="delete" data-id="{{ target.id }}" data-name="{{ target.name }}" class="btn btn-danger"><i class="mdi mdi-16px mdi-delete"></i></button></td>
 														</tr>
 														{% endfor %}
 													</tbody>
@@ -51,7 +48,7 @@
 								</div>
 								
 								<!-- GENERIC MODAL -->
-								<div class="modal" id="deleteModal" tabindex="-1" role="dialog">
+								<div class="modal" id="genericModel" tabindex="-1" role="dialog">
 								  <div class="modal-dialog" role="document">
 									<div class="modal-content">
 									  <div class="modal-header">
@@ -64,15 +61,46 @@
 										<p>Are you sure ?</p>
 									  </div>
 									  <div class="modal-footer">
-										<button type="button" class="btn btn-secondary" data-dismiss="modal">No</button>
-										<button type="button" class="btn btn-primary">Yes, proceed</button>
+										<button type="button" class="btn btn-secondary" data-dismiss="modal" id="cancel">No</button>
+										<button type="button" class="btn btn-primary btn-danger" id="proceed">Yes, proceed</button>
 									  </div>
 									</div>
 								  </div>
 								</div>
 								
 								<script>
-									$('#msexampleModal').on('show.bs.modal'), function( (e) {
+									$('#genericModel').on('show.bs.modal', function (e) {
+
+									var button = $(e.relatedTarget);
+									var modal = $(this);
+									var modalType = button.data('modaltype')
+
+									if (modalType == 'delete')
+									{
+										modal.find('.modal-title').html('Confirm');
+									    modal.find('.modal-body').html('Are you sure you want to delete ' + button.data('name') + ' ? ');
+										modal.find('#cancel').show();
+										modal.find('#proceed').html('Proceed');
+									    //modal.find('#proceed').attr('href', ('/delete/' + button.data('id')));
+										modal.find('#proceed').off('click');
+										modal.find('#proceed').on('click', function () {
+										    location.href='/delete/' + button.data('id');
+										});
+									}
+									if (modalType == 'info')
+									{
+										modal.find('.modal-title').html('Information');
+									    modal.find('.modal-body').html(button.data('info'));
+										modal.find('#cancel').hide();
+										modal.find('#proceed').html('OK');
+										modal.find('#proceed').off('click');
+										modal.find('#proceed').on('click', function () {
+										    modal.modal('toggle');
+										});
+									}
+
+});
+								</script>
 									    
 								
 								<script src="assets/plugins/data-tables/jquery.datatables.min.js"></script>
