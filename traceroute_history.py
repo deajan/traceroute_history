@@ -79,7 +79,13 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
             if not current_tr_object.hops[index].probes[0].ip == previous_tr_object.hops[index].probes[0].ip:
                 different_hops.append(current_tr_object.hops[index].idx)
         except IndexError:
-            different_hops.append(current_tr_object.hops[index].idx)
+            try:
+                different_hops.append(current_tr_object.hops[index].idx)
+            except IndexError:
+                try:
+                    different_hops.append(previous_tr_object.hops[index].idx)
+                except IndexError:
+                    pass
 
         # Try to spot increased rtt
         if rtt_detection_threshold != 0:
