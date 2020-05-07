@@ -84,7 +84,7 @@
 									    //modal.find('#proceed').attr('href', ('/delete/' + button.data('id')));
 										modal.find('#proceed').off('click');
 										modal.find('#proceed').on('click', function () {
-										    location.href='/delete/' + button.data('name');
+										    location.href='/delete/' + button.data('id');
 										});
 									}
 									if (modalType == 'info')
