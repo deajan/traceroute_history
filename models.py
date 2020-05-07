@@ -28,12 +28,12 @@ class Traceroute(Base):
 
     id = Column(Integer, primary_key=True)
     creation_date = Column(DateTime(timezone=True), server_default=func.now())  # using func.now() guarantees UTC data
-    traceroute = Column(String(2048), nullable=False)
+    raw_traceroute = Column(String(2048), nullable=False)
     target_id = Column(Integer, ForeignKey('target.id'))
     target = relationship('Target')
 
     def __repr__(self):
-        return 'Traceroute recorded at {0}:\n {1}'.format(self.creation_date, self.traceroute)
+        return 'Traceroute recorded at {0}:\n {1}'.format(self.creation_date, self.raw_traceroute)
 
 
 # Many to Many relationship

@@ -22,11 +22,11 @@ from typing import List, Optional, Union
 from ipaddress import IPv4Address, IPv6Address
 import datetime
 
-fqdn = constr(min_length=2, max_length=2083, strip_whitespace=True, regex=r'^(?!:\/\/)(?=.{1,255}$)((.{1,63}\.){1,127}(?![0-9]*$)[a-z0-9-]+\.?)$')
+FQDN = constr(min_length=2, max_length=2083, strip_whitespace=True, regex=r'^(?!:\/\/)(?=.{1,255}$)((.{1,63}\.){1,127}(?![0-9]*$)[a-z0-9-]+\.?)$')
 
 
 class TracerouteBase(BaseModel):
-    traceroute: str = Field(..., description='Textual version of a traceroute', max_length=2048)
+    raw_traceroute: str = Field(..., description='Raw version of a traceroute', max_length=2048)
 
 
 class TracerouteCreate(TracerouteBase):
@@ -41,7 +41,7 @@ class Traceroute(TracerouteBase):
 
     """
     id: int
-    target_id: int = Field(..., descrption='target id')
+    target_id: int = Field(..., descrption='Owner target id')
     creation_date: datetime.datetime = Field(None, description='Creation date, is set automagically')
 
     class Config:
@@ -67,12 +67,12 @@ class Group(GroupBase):
 
 class TargetBase(BaseModel):
     name: str = Field(..., description='User friendly name target name', max_length=255)
-    address: Union[IPv4Address, IPv6Address, fqdn] = Field(..., description='Address should be a IPv4, IPv6 or a fqdn address')
-    groups: Optional[List[Group]] = Field(None, description='List of groups')
+    address: Union[IPv4Address, IPv6Address, FQDN] = Field(..., description='Address should be a IPv4, IPv6 or a fqdn address')
+    groups: Optional[List[Group]] = Field(None, description='List of groups as group Schemas')
 
 
 class TargetCreate(TargetBase):
-    pass
+    groups: Optional[List[GroupCreate]] = Field(None, description='List of groups as group Schemas')
 
 
 class Target(TargetBase):
