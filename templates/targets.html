@@ -34,7 +34,7 @@
 																		<button class="btn btn-warning btn-circle">{{ group }}</button>
 																	{% endfor %}
 																{% endif %}</td>
-															<td class="align-middle">{% if target.last_check %}<button href="#" class="btn" data-toggle="modal" data-target="#genericModel" data-modaltype="info" data-info="{{ target.current_tr }}"><i class=""></i>{{ target.last_check }}</button>{% endif %}</td>
+															<td class="align-middle">{% if target.last_probe %}<button href="#" data-toggle="modal" data-target="#genericModel" data-modaltype="info" data-info="{{ target.current_tr }}">{{ target.last_probe }}</button>{% endif %}</td>
 															<td class="align-middle">{{ target.current_rtt }}</td>
 															<td class="align-middle">{{ target.previous_rtt }}</td>
 															<td class="align-middle"><button type="button" data-toggle="modal" data-target="#genericModel" data-modaltype="delete" data-id="{{ target.id }}" data-name="{{ target.name }}" class="btn btn-danger"><i class="mdi mdi-16px mdi-delete"></i></button></td>
