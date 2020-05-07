@@ -18,6 +18,11 @@ __version__ = '0.2.0'
 __build__ = '2020050601'
 
 from fastapi import FastAPI, Request
+
+# Data validation
+from pydantic import BaseModel, Field
+from typing import List, Optional
+
 import uvicorn
 
 from fastapi.templating import Jinja2Templates
@@ -31,6 +36,12 @@ logger = ofunctions.logger_get_logger()
 traceroute_history.load_config()
 traceroute_history.load_database()
 targets = traceroute_history.list_targets(include_tr=True, formatting='web')
+
+
+class Target(BaseModel):
+    name: str = Field(..., description='User friendly name target name', max_length=255)
+    address: str = Field(..., description='Address should be a IPv4, IPv6 or a fqdn address', max_length=255)
+    groups: Optional[List[str]] = Field(None, description='List of groups')
 
 
 app = FastAPI()
@@ -62,10 +73,21 @@ async def index(request: Request):
                                       {'request': request, 'targets': targets, 'system': get_system_data()})
 
 
-@app.get('/delete/{name}')
-async def delete(name):
-    traceroute_history.remove_target(name)
-    return 'Id={}'.format(name)
+@app.get('/target/{name}')
+async def target_get():
+    return
+
+@app.post('/target')
+async def target_new(target: Target):
+    return target
+
+@app.put('/target/{name}')
+async def target_update(target: Target):
+    return target
+
+@app.delete('/target/{name}')
+async def target_delete(name):
+    return traceroute_history.remove_target(name)
 
 
 #def target_list
