@@ -474,15 +474,17 @@ def get_targets_from_config():
 
 
 def remove_target(name):
+    load_config()
     remove_target_from_config(name)
     delete_old_traceroutes(name, 0, 0)
+    save_config()
 
 
 def remove_target_from_config(name):
-    for section in CONFIG.sections():
-        if section.startswith('TARGET:'):
-            if section.lstrip('TARGET:') == name:
-                CONFIG.remove_section(section)
+    try:
+        CONFIG.remove_section('TARGET:' + name)
+    except KeyError:
+        pass
 
 
 def execute(daemon=False):
