@@ -141,7 +141,6 @@ GUI functions
 @app.get('/')
 async def index(request: Request):
     targets = traceroute_history.list_targets(include_tr=True, formatting='web')
-    print(targets)
     return templates.TemplateResponse('targets.html',
                                       {'request': request, 'targets': targets, 'system': get_system_data()})
 
