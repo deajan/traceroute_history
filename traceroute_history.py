@@ -477,7 +477,7 @@ def remove_target(name):
     load_config()
     remove_target_from_config(name)
     delete_old_traceroutes(name, 0, 0)
-    save_config()
+    return save_config()
 
 
 def remove_target_from_config(name):
@@ -679,6 +679,7 @@ def help_():
     print('--update-now                         Manual update of traceroute targets')
     print(
         '--get-traceroutes-for=name[,x]       Print x traceroutes for target "name". If no x value is given, all are shown')
+    print('--remove-target=name                 Removes given target from configuration and deletes target data from database')
     print('--list-targets                       Extract a list of current targets in database"')
     print('--init-db                            Initialize a fresh database.')
     sys.exit()
@@ -693,6 +694,7 @@ def main(argv):
     try:
         opts, _ = getopt.getopt(argv, "h?",
                                 ['config=', 'smokeping-config=', 'get-traceroutes-for=', 'list-targets',
+                                 'remove-target=',
                                  'daemon', 'update-now',
                                  'init-db', 'help'])
     except getopt.GetoptError:
@@ -732,7 +734,6 @@ def main(argv):
     opt_found = False
     for opt, arg in opts:
         if opt == '--get-traceroutes-for':
-            opt_found = True
             try:
                 target, limit = arg.split(',')
                 limit = int(limit)
@@ -742,9 +743,11 @@ def main(argv):
             print(get_last_traceroutes_formatted(target, limit))
             sys.exit(0)
         if opt == '--list-targets':
-            opt_found = True
             print(json.dumps(list_targets(), indent=2, sort_keys=True, default=str))
             sys.exit(0)
+        if opt == '--remove-target':
+            res = remove_target(arg)
+            sys.exit(res)
         if opt == '--daemon':
             opt_found = True
             execute(daemon=True)
