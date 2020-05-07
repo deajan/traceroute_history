@@ -5,7 +5,7 @@
 traceroute_history is a quick tool to make traceroute / tracert calls, and store it's results into a database if it
 differs from last call.
 
-Targets can be configured in a config file,
+Targets are configured in a config file,
 Also happens to read smokeping configuration files to populate targets to probe
 
 """
@@ -14,28 +14,28 @@ __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.3.0'
+__version__ = '0.4.0'
 __build__ = '2020050601'
 
 import os
 import sys
-import re
 import getopt
 import ofunctions
 from apscheduler.schedulers.background import BackgroundScheduler
 from time import sleep
-from sqlalchemy import create_engine, and_
-from sqlalchemy.orm import sessionmaker, scoped_session
+from sqlalchemy import and_
 import sqlalchemy.exc
 from datetime import datetime, timedelta
 from command_runner import command_runner
 import trparse
-from sql_declaration import Target, Traceroute, Group, init_db
-import configparser
-from contextlib import contextmanager
 import json
-import urllib.parse
 from decimal import Decimal
+import crud
+import models
+import schemas
+import config_management
+from pydantic import ValidationError
+from database import load_database, db_scoped_session
 
 # colorama is not mandatory
 try:
@@ -46,13 +46,47 @@ except ImportError:
     pass
 
 CONFIG_FILE = 'traceroute_history.conf'
-SMOKEPING_CONFIG_FILE = None
-DB_SESSION_FACTORY = None
-DB_GLOBAL_READ_SESSION = None
-CONFIG = None
 
 LOG_FILE = os.path.join(os.path.dirname(__file__), os.path.splitext(os.path.basename(__file__))[0]) + '.log'
 logger = ofunctions.logger_get_logger(log_file=LOG_FILE)
+
+
+def format_string(string: str, formatting: str='console'):
+    """
+    Formats strings for console or web output
+
+
+    :param string: (str) String to format (contains {% %} values)
+    :param formatting: (str) console/web/none
+    :return: (str) formatted string
+    """
+    if string is None or string is []:
+        return string
+
+    if formatting == 'web':
+        green_color = '<span class="green traceroute-green" style="background-color: darkgreen; color:white">'
+        red_color = '<span class="red traceroute-red" style="background-color: darkred; color:white">'
+        end_color = '</span>'
+    elif formatting == 'console':
+        try:
+            green_color = colorama.Back.LIGHTGREEN_EX + colorama.Fore.BLACK
+            red_color = colorama.Back.LIGHTRED_EX + colorama.Fore.BLACK
+        except NameError:
+            # missing colorama module ?
+            green_color = '\033[102m'
+            red_color = '\033[101m'
+        end_color = '\033[0m'
+    else:
+        green_color = red_color = end_color = ''
+
+    string = string.replace('{% START_COLOR_GREEN %}', green_color)
+    string = string.replace('{% START_COLOR_RED %}', red_color)
+    string = string.replace('{% END_COLOR %}', end_color)
+
+    if formatting == 'web':
+        return string.replace('\n', '<br />')
+    else:
+        return string
 
 
 def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_threshold: int=0):
@@ -61,8 +95,8 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
     Returns list of different hops and increased rtt times
 
     :param current_tr: (str) raw traceeroute output
-    :param previous_tr: (str) raw
-    :return: (list)
+    :param previous_tr: (str) raw traceroute output
+    :return: (list) list of different indexes, or where rtt difference is higher than detection threshold
     """
     current_tr_object = trparse.loads(current_tr)
     previous_tr_object = trparse.loads(previous_tr)
@@ -82,10 +116,7 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
             try:
                 different_hops.append(current_tr_object.hops[index].idx)
             except IndexError:
-                try:
-                    different_hops.append(previous_tr_object.hops[index].idx)
-                except IndexError:
-                    pass
+                different_hops.append(previous_tr_object.hops[index].idx)
 
         # Try to spot increased rtt
         if rtt_detection_threshold != 0:
@@ -104,16 +135,17 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
     return different_hops, increased_rtt
 
 
-def traceroutes_difference_preformatted(tr1, tr2):
+def traceroutes_difference_preformatted(tr1: models.Traceroute, tr2: models.Traceroute):
     """
     Outputs traceroute differences with color highlighting in console
-    :param tr1: (str) Traceroute sqlalchemy object
-    :param tr2: (str) Tracerouet sqlalchemy object
+    :param tr1: (Traceroute) Traceroute model object
+    :param tr2: (Traceroute) Tracerouet model object
     :return: (str) diff colorred traceroute outputs
     """
 
     try:
-        rtt_detection_threshold = int(CONFIG['TRACEROUTE_HISTORY']['rtt_detection_threshold'])
+        config = config_management.load_config(CONFIG_FILE)
+        rtt_detection_threshold = int(config['TRACEROUTE_HISTORY']['rtt_detection_threshold'])
     except KeyError:
         rtt_detection_threshold = 0
     except TypeError:
@@ -147,7 +179,7 @@ def traceroutes_difference_preformatted(tr1, tr2):
                                                                                                      '{% START_COLOR_RED %}'))
 
 
-def get_traceroute(address):
+def os_traceroute(address):
     """
     Launches actuel traceroute binary
 
@@ -173,104 +205,69 @@ def get_traceroute(address):
     return 1, 'Bogus address given.'
 
 
-@contextmanager
-def db_scoped_session():
-    """Provide a transactional scope around a series of operations."""
-    session = DB_SESSION_FACTORY()
-    try:
-        yield session
-        session.commit()
-        session.flush()
-    except:
-        session.rollback()
-        raise
-    finally:
-        session.close()
-
-
-def insert_traceroute(target, traceroute_output):
-    """
-    Creates new traceroute entry in DB
-
-    :param target: Target SQL object
-    :param traceroute_output: raw traceroute output
-    :return:
-    """
-    traceroute = Traceroute(traceroute=traceroute_output, target=target)
-    with db_scoped_session() as session:
-        session.add(traceroute)
-
-
-def create_group(name, target):
-    pass
-
-
-def create_target(name, address=None, groups=None):
-    """
-    Creates new target to monitor in DB
-
-    :param name: (str) target user friendly name (can be anything)
-    :param address: (str) hostname in fqdn, ipv4 or ipv6 format
-    :param groups: (list)(str) list of groups to which this target belongs
-    :return: (Target) target object
-    """
-    # for group in groups:
-    #    try:
-    #        group = db_session.query(Group).filter(Group.name == group).one()
-
-    target = Target(name=name, address=address)
-    with db_scoped_session() as session:
-        session.add(target)
-
-    return target
-
-
-def update_traceroute_database(name, address, groups):
+def update_traceroute_database(target: schemas.TargetCreate):
     """
     Executes tracert for given name, and updates database accordingly
 
-    :param name: (str) target user friendly name (can be anything)
+    :param target_name: (str) target user friendly name (can be anything)
     :param address: (str) hostname in fqdn, ipv4 or ipv6 format
     :param groups: (list)(str) list of groups to which this target belongs
     :return:
     """
 
-    try:
-        with db_scoped_session() as session:
-            try:
-                target = session.query(Target).filter(Target.name == name).one()
-            except sqlalchemy.orm.exc.NoResultFound:
-                target = None
-            if not target:
-                target = create_target(name, address, groups)
-                logger.info('Created new target: {0}.'.format(name))
-            exit_code, current_trace = get_traceroute(target.address)
+    config = config_management.load_config(CONFIG_FILE)
+
+    with db_scoped_session() as db:
+        try:
+            # Create groups if not exist
+            tgt_groups = []
+            for group_name in target.groups:
+                grp = crud.get_group(db=db, name=group_name)
+                if not grp:
+                    group = schemas.GroupCreate(name=group_name)
+                    grp = crud.create_group(db=db, group=group)
+                    logger.info('Created new group "{0}".'.format(group.name))
+                tgt_groups.append(grp)
+
+            # Create targets if not exist
+            tgt = crud.get_target(db=db, name=target.name)
+            if not tgt:
+                target.groups = tgt_groups
+                target = crud.create_target(db=db, target=target)
+                logger.info('Created new target "{0}".'.format(target.name))
+            else:
+                target = tgt
+
+            # Get traceroute
+            exit_code, raw_traceroute = os_traceroute(target.address)
             if exit_code == 0:
-                last_trace = session.query(Traceroute).filter(Traceroute.target == target).order_by(
-                    Traceroute.id.desc()).first()
-                if last_trace:
+                previous_traceroute = crud.get_traceroutes_by_target(db=db, target_name=target.name, limit=1)
+                if previous_traceroute:
                     try:
-                        rtt_detection_threshold = int(CONFIG['TRACEROUTE_HISTORY']['rtt_detection_threshold'])
+                        rtt_detection_threshold = int(config['TRACEROUTE_HISTORY']['rtt_detection_threshold'])
                     except KeyError:
                         rtt_detection_threshold = 0
                     except TypeError:
                         logger.warning('Bogus rtt_detection_threshold value.')
                         rtt_detection_threshold = 0
-                    different_hops, increased_rtt = analyze_traceroutes(last_trace.traceroute, current_trace, rtt_detection_threshold=rtt_detection_threshold)
+                    different_hops, increased_rtt = analyze_traceroutes(raw_traceroute, previous_traceroute[0].traceroute, rtt_detection_threshold=rtt_detection_threshold)
                     if different_hops or increased_rtt:
-                        insert_traceroute(target, current_trace)
-                        logger.info('Updating different traceroute for target "{0}".'.format(name))
+                        current_traceroute = schemas.TracerouteCreate(traceroute=raw_traceroute)
+                        crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
+                        logger.info('Updating traceroute for target "{0}".'.format(target.name))
                     else:
-                        logger.debug('Traceroute identical to last one for target "{0}". Nothing to do.'.format(name))
+                        logger.debug('Current traceroute is identical to previous one for target "{0}". Nothing to do.'.format(target.name))
                 else:
-                    insert_traceroute(target, current_trace)
-                    logger.info('Created first tracreoute entry for target "{0}".'.format(name))
+                    current_traceroute = schemas.TracerouteCreate(traceroute=raw_traceroute)
+                    crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
+                    logger.info('Created traceroute for target "{0}".'.format(target.name))
             else:
-                logger.error('Cannot get traceroute for target "{0}".'.format(name))
-                insert_traceroute(target, current_trace)
-    except sqlalchemy.exc.OperationalError as exc:
-        logger.error('sqlalchemy operation error: {0}.'.format(exc))
-        logger.error('Trace:', exc_info=True)
+                logger.error('Cannot get traceroute for target "{0}".'.format(target.name))
+                current_traceroute = schemas.TracerouteCreate(traceroute=raw_traceroute)
+                crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
+        except sqlalchemy.exc.OperationalError as exc:
+            logger.error('sqlalchemy operation error: {0}.'.format(exc))
+            logger.error('Trace:', exc_info=True)
 
 
 def get_last_traceroutes(name, limit=1):
@@ -283,21 +280,21 @@ def get_last_traceroutes(name, limit=1):
 
     """
     # Let's use a single global read session which we won't close so ORM objects are still mapped to session after usage
-    session = DB_GLOBAL_READ_SESSION
-    try:
-        target = session.query(Target).filter(Target.name == name).one()
-    except sqlalchemy.orm.exc.NoResultFound:
-        return False
+    with db_scoped_session() as session:
+        try:
+            target = session.query(models.Target).filter(models.Target.name == name).one()
+        except sqlalchemy.orm.exc.NoResultFound:
+            return False
 
-    last_trace = session.query(Traceroute).filter(Traceroute.target == target).order_by(Traceroute.id.desc()).limit(
-        limit).all()
-    return last_trace
+        last_trace = session.query(models.Traceroute).filter(models.Traceroute.target == target).order_by(models.Traceroute.id.desc()).limit(
+            limit).all()
+        return last_trace
 
 
 def get_last_traceroutes_formatted(name, limit=1, formatting='console'):
     traceroutes = get_last_traceroutes(name, limit=limit)
     if traceroutes is False:
-        logger.warning('Target {0} has been requested but does not exist in database.'.format(name))
+        logger.warning('Target "{0}" has been requested but does not exist in database.'.format(name))
         return 'Target not found in database.'
     if traceroutes:
         output = 'Target has {0} tracreoute entries.'.format(len(traceroutes))
@@ -315,53 +312,14 @@ def get_last_traceroutes_formatted(name, limit=1, formatting='console'):
     return format_string(output, formatting)
 
 
-def format_string(string: str, formatting: str='console'):
-    if string is None or string is []:
-        return string
-
-    if formatting == 'web':
-        green_color = '<span class="green traceroute-green" style="background-color: darkgreen; color:white">'
-        red_color = '<span class="red traceroute-red" style="background-color: darkred; color:white">'
-        end_color = '</span>'
-    elif formatting == 'console':
-        try:
-            green_color = colorama.Back.LIGHTGREEN_EX + colorama.Fore.BLACK
-            red_color = colorama.Back.LIGHTRED_EX + colorama.Fore.BLACK
-        except NameError:
-            # missing colorama module ?
-            green_color = '\033[102m'
-            red_color = '\033[101m'
-        end_color = '\033[0m'
-    else:
-        green_color = red_color = end_color = ''
-
-    string = string.replace('{% START_COLOR_GREEN %}', green_color)
-    string = string.replace('{% START_COLOR_RED %}', red_color)
-    string = string.replace('{% END_COLOR %}', end_color)
-
-    if formatting == 'web':
-        return string.replace('\n', '<br />')
-    else:
-        return string
-
-
-def get_groups_from_config(name):
-    targets = get_targets_from_config()
-    for target in targets:
-        try:
-            if target.lstrip('TARGET:') == name:
-                return [group.strip() for group in CONFIG[target]['groups'].split(',')]
-        except KeyError:
-            return None
-
-
 def list_targets(include_tr: bool=False, formatting: str='console'):
-    with db_scoped_session() as session:
+
+    with db_scoped_session() as db:
         output = []
         try:
-            targets = session.query(Target).all()
+            targets = crud.get_targets(db=db)
             for target in targets:
-                groups = get_groups_from_config(target.name)
+                groups = crud.get_groups_by_target(db=db, target_id=target.id)
                 traces = get_last_traceroutes(target.name, limit=2)
                 try:
                     current_tr = traces[0]
@@ -377,7 +335,7 @@ def list_targets(include_tr: bool=False, formatting: str='console'):
                     previous_tr = None
                     previous_rtt = None
 
-                target = {'id': target.id, 'name': target.name, 'address': target.address, 'groups': groups,
+                target = {'id': target.id, 'name': target.name, 'address': target.address, 'groups': [group.name for group in groups],
                                'current_rtt': current_rtt, 'previous_rtt': previous_rtt,
                                'last_check': current_tr.creation_date }
                 if include_tr:
@@ -393,98 +351,42 @@ def list_targets(include_tr: bool=False, formatting: str='console'):
             return None
 
 
-def delete_old_traceroutes(name: str, days: int, keep: int):
+def delete_old_traceroutes(target_name: str, days: int, keep: int):
     """
     Deletes old traceroute data if days have passed, but always keep at least limit entries
 
-    :param name: (str) target name
+    :param target_name: (str) target name
     :param days: (int) number of days after which a traceroute will be deleted
     :param keep: (int) number of traceroutes to keep regardless of the
     :return:
     """
 
-    with db_scoped_session() as session:
-        try:
-            target = session.query(Target).filter(Target.name == name).one()
-        except sqlalchemy.orm.exc.NoResultFound:
+    with db_scoped_session() as db:
+        target = crud.get_target(db=db, name=target_name)
+        if not target:
             return None
 
-        num_records = session.query(Traceroute).filter(Traceroute.target == target).count()
+        num_records = crud.get_traceroutes_by_target(db=db, target_name=target_name, count=True)
         if num_records > keep:
             num_records_to_delete = num_records - keep
+
+            # TODO: IS NOT CRUD CONVERTED
+
             # Subquery is needed because we cannot use delete() on a query with a limit
-            subquery = session.query(Traceroute.id).filter(and_(Traceroute.target == target,
-                                                                Traceroute.creation_date < (datetime.now() - timedelta(
-                                                                    days=days)))).order_by(Traceroute.id.desc()).limit(
+            subquery = db.query(models.Traceroute.id).filter(and_(models.Traceroute.target == target,
+                                                                models.Traceroute.creation_date < (datetime.now() - timedelta(
+                                                                    days=days)))).order_by(models.Traceroute.id.desc()).limit(
                 num_records_to_delete).subquery()
-            records = session.query(Traceroute).filter(Traceroute.id.in_(subquery)).delete(synchronize_session='fetch')
-            logger.info('Deleted {0} old records for target "{1}".'.format(records, name))
+            records = db.query(models.Traceroute).filter(models.Traceroute.id.in_(subquery)).delete(synchronize_session='fetch')
+            logger.info('Deleted {0} old records for target "{1}".'.format(records, target_name))
 
 
-def read_smokeping_config(config_file):
-    """
-    Read smokeping config file
-    TODO: does not support missing title or target directives (will shift values)
 
-    :param config_file: (str) path to config file
-    :return: (list)(dict) [{'target': x, 'title': y}]
-    """
-    if config_file == '':
-        return None
-    if not os.path.isfile(config_file):
-        logger.error('smokeping config "{0}" does not seem to be a file.'.format(config_file))
-        return None
-
-    target_regex = re.compile(r'^host\s*=\s*(\S*)$')
-    title_regex = re.compile(r'^title\s*=\s*(.*)$')
-
-    targets = []
-    names = []
-
-    with open(config_file, 'r') as smokeping_config:
-        for line in smokeping_config:
-            target = re.match(target_regex, line)
-            name = re.match(title_regex, line)
-            if target:
-                targets.append(target)
-            if name:
-                names.append(target)
-
-    if len(targets) != len(names):
-        logger.error('Cannot parse smokeping config file. We need as much titles as host entries.')
-        return None
-
-    # TODO Add regex for group inclusion / exclusion
-
-    return [{'target': target, 'name': name} for target, name in zip(targets, names)]
-
-
-def get_targets_from_config():
-    targets = [section.lstrip('TARGET:') for section in CONFIG.sections() if section.startswith('TARGET:')]
-    try:
-        smokeping_config = CONFIG['SMOKEPING_SOURCE']['smokeping_config_path']
-    except KeyError:
-        smokeping_config = None
-    smokeping_targets = read_smokeping_config(smokeping_config)
-    if smokeping_targets:
-        targets = targets + smokeping_targets
-
-    print(targets)
-    return targets
-
-
-def remove_target(name):
-    load_config()
-    remove_target_from_config(name)
-    delete_old_traceroutes(name, 0, 0)
-    return save_config()
-
-
-def remove_target_from_config(name):
-    try:
-        CONFIG.remove_section('TARGET:' + name)
-    except KeyError:
-        pass
+def remove_target(target_name):
+    config = config_management.load_config(CONFIG_FILE)
+    config_management.remove_target_from_config(config, target_name)
+    delete_old_traceroutes(target_name, 0, 0)
+    return config_management.save_config(CONFIG_FILE, config)
 
 
 def execute(daemon=False):
@@ -494,10 +396,10 @@ def execute(daemon=False):
     :param daemon: (bool) Should this run in a loop
     :return:
     """
-    config = CONFIG
-    targets = get_targets_from_config()
+    config = config_management.load_config(CONFIG_FILE)
+    target_names = config_management.get_targets_from_config(config)
 
-    if len(targets) == 0:
+    if len(target_names) == 0:
         logger.info('No valid targets given.')
         sys.exit(20)
 
@@ -528,16 +430,17 @@ def execute(daemon=False):
         logger.error('Bogus minimum_keep value. Using default.')
         minimum_keep = 100
 
-    for target in targets:
+    for target_name in target_names:
         try:
-            target_name = target
+            tgt = schemas.TargetCreate(name=target_name, address=config['TARGET:' + target_name]['address'],
+                                   groups = config_management.get_groups_from_config(config, target_name))
+
             job_kwargs = {
-                'name': target_name,
-                'address': config['TARGET:' + target]['address'],
-                'groups': config['TARGET:' + target]['groups']
+                'target': tgt
             }
+
             delete_kwargs = {
-                'name': target_name,
+                'target_name': target_name,
                 'days': delete_history_days,
                 'keep': minimum_keep
             }
@@ -554,8 +457,13 @@ def execute(daemon=False):
                                   name='startup-housekeeping-' + target_name, id='startup-housekeeping-' + target_name)
                 scheduler.add_job(delete_old_traceroutes, 'interval', [], delete_kwargs, hours=1,
                                   name='housekeeping-' + target_name, id='housekeeping-' + target_name)
+
+            # TODO add regular config file reloading job ?
+
         except KeyError as exc:
-            logger.error('Failed to read configuration for target "{0}": {1}.'.format(target, exc), exc_info=True)
+            logger.error('Failed to read configuration for target "{0}": {1}.'.format(target_name, exc))
+        except ValidationError as exc:
+            logger.error('Bogus target "{0}" given: {1}.'.format(target_name, exc))
 
     run_once = True
     try:
@@ -565,101 +473,6 @@ def execute(daemon=False):
     except KeyboardInterrupt:
         logger.info('Interrupted by keyboard')
         scheduler.shutdown()
-
-
-def load_config():
-    """
-    Loads config from file
-
-    :return: (ConfigParser) config object
-    """
-    global CONFIG
-
-    if CONFIG_FILE is None or not os.path.isfile(CONFIG_FILE):
-        print(
-            'Cannot load configuration file "{0}". Please use --config=[config file].'.format(CONFIG_FILE))
-        sys.exit(10)
-    config = configparser.ConfigParser()
-    try:
-        config.read(CONFIG_FILE)
-    except (configparser.MissingSectionHeaderError, KeyError):
-        print('Unknown database configuration.')
-        sys.exit(12)
-    CONFIG = config
-
-
-def save_config():
-    """
-    Saves config to file
-
-    :return: (bool)
-    """
-
-    if CONFIG_FILE is None or not os.path.isfile(CONFIG_FILE):
-        logger.error('Cannot save configuration file "{0}".'.format(CONFIG_FILE))
-
-    try:
-        with open(CONFIG_FILE, 'w') as fp:
-            CONFIG.write(fp)
-            return True
-    except OSError as exc:
-        logger.critical('Cannot save configuration file. {}'.format(exc))
-        return False
-
-
-def load_database(initialize=False):
-    """
-    Initiates database session as scoped session so we can reutilise the factory in a threaded model
-
-    :return:
-    """
-    global DB_SESSION_FACTORY
-    global DB_GLOBAL_READ_SESSION
-
-
-    db_driver = CONFIG['TRACEROUTE_HISTORY']['database_driver']
-    db_host = CONFIG['TRACEROUTE_HISTORY']['database_host']
-
-    try:
-        db_user = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_user'])
-        db_password = urllib.parse.quote_plus(CONFIG['TRACEROUTE_HISTORY']['database_password'])
-    except KeyError:
-        db_user = None
-        db_password = None
-    try:
-        db_name = CONFIG['TRACEROUTE_HISTORY']['database_name']
-    except KeyError:
-        db_name = None
-
-    if db_driver == 'sqlite' and not os.path.isfile(db_host) and initialize is False:
-        logger.critical('No database file: "{0}". Please provide path in configuration file, or use --init-db to create a new database.'.format(db_host))
-        sys.exit(3)
-
-    if db_driver == 'sqlite':
-        db_name = ''
-    elif db_name:
-        db_name = '/' + db_name
-
-    if db_user and db_password and db_driver != 'sqlite':
-        connection_string = '{0}:///{1}:{2}@{3}{4}'.format(db_driver, db_user, db_password, db_host, db_name)
-    else:
-        connection_string = '{0}:///{1}{2}'.format(db_driver, db_host, db_name)
-
-    logger.debug('SQL Connection string "{0}".'.format(connection_string))
-    if initialize:
-        db_engine = create_engine(connection_string, echo=True)
-        init_db(db_engine)
-        logger.info('DB engine initialization finished.')
-        sys.exit(0)
-    else:
-        try:
-            logger.info('Trying to open {0} database "{1}{2}" as user "{2}".'.format(db_driver, db_host, db_name, db_user, db_password))
-            engine = create_engine(connection_string, echo=False)
-            session_factory = sessionmaker(bind=engine)
-            DB_SESSION_FACTORY = scoped_session(session_factory)
-            DB_GLOBAL_READ_SESSION = DB_SESSION_FACTORY()
-        except sqlalchemy.exc.OperationalError:
-            logger.critical('Cannot connect to database "{0}".'.format(db_host), exc_info=True)
 
 
 def help_():
@@ -673,8 +486,6 @@ def help_():
     print('')
     print(
         '--config=                            Path to config file. If none given, traceroute_history.conf in the current directory is tried.')
-    print(
-        '--smokeping-config=                  Optional path to smokeping config, in order to read additional targets from')
     print('--daemon                             Run as daemon')
     print('--update-now                         Manual update of traceroute targets')
     print(
@@ -686,14 +497,12 @@ def help_():
 
 
 def main(argv):
-    global CONFIG
     global CONFIG_FILE
-    global SMOKEPING_CONFIG_FILE
     global logger
 
     try:
         opts, _ = getopt.getopt(argv, "h?",
-                                ['config=', 'smokeping-config=', 'get-traceroutes-for=', 'list-targets',
+                                ['config=', 'get-traceroutes-for=', 'list-targets',
                                  'remove-target=',
                                  'daemon', 'update-now',
                                  'init-db', 'help'])
@@ -706,13 +515,11 @@ def main(argv):
         if opt == '--config':
             CONFIG_FILE = arg
             config_file_set = True
-        if opt == '--smokeping-config':
-            SMOKEPING_CONFIG_FILE = arg
 
     # Reload config before executing anything elsee
-    load_config()
+    config = config_management.load_config(CONFIG_FILE)
     try:
-        log_file = CONFIG['TRACEROUTE_HISTORY']['log_file']
+        log_file = config['TRACEROUTE_HISTORY']['log_file']
         logger = ofunctions.logger_get_logger(log_file=log_file)
     except KeyError:
         pass
@@ -729,7 +536,7 @@ def main(argv):
         if opt == '--init-db':
             initialize = True
 
-    load_database(initialize=initialize)
+    load_database(config, initialize=initialize)
 
     opt_found = False
     for opt, arg in opts:
