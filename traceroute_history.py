@@ -151,7 +151,7 @@ def traceroutes_difference_preformatted(tr1: models.Traceroute, tr2: models.Trac
     except TypeError:
         logger.warning('Bogus rtt_detection_threshold value.')
         rtt_detection_threshold = 0
-    different_hops, increased_rtt = analyze_traceroutes(tr1.traceroute, tr2.traceroute, rtt_detection_threshold=rtt_detection_threshold)
+    different_hops, increased_rtt = analyze_traceroutes(tr1.raw_traceroute, tr2.raw_traceroute, rtt_detection_threshold=rtt_detection_threshold)
 
 
 
@@ -172,10 +172,10 @@ def traceroutes_difference_preformatted(tr1: models.Traceroute, tr2: models.Trac
         return console_output
 
     return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
-                                                                                     _console_output(tr1.traceroute,
+                                                                                     _console_output(tr1.raw_traceroute,
                                                                                                      '{% START_COLOR_GREEN %}'),
                                                                                      tr2.creation_date,
-                                                                                     _console_output(tr2.traceroute,
+                                                                                     _console_output(tr2.raw_traceroute,
                                                                                                      '{% START_COLOR_RED %}'))
 
 
@@ -221,10 +221,9 @@ def update_traceroute_database(target: schemas.TargetCreate):
         try:
             # Create groups if not exist
             tgt_groups = []
-            for group_name in target.groups:
-                grp = crud.get_group(db=db, name=group_name)
+            for group in target.groups:
+                grp = crud.get_group(db=db, name=group.name)
                 if not grp:
-                    group = schemas.GroupCreate(name=group_name)
                     grp = crud.create_group(db=db, group=group)
                     logger.info('Created new group "{0}".'.format(group.name))
                 tgt_groups.append(grp)
@@ -250,27 +249,27 @@ def update_traceroute_database(target: schemas.TargetCreate):
                     except TypeError:
                         logger.warning('Bogus rtt_detection_threshold value.')
                         rtt_detection_threshold = 0
-                    different_hops, increased_rtt = analyze_traceroutes(raw_traceroute, previous_traceroute[0].traceroute, rtt_detection_threshold=rtt_detection_threshold)
+                    different_hops, increased_rtt = analyze_traceroutes(raw_traceroute, previous_traceroute[0].raw_traceroute, rtt_detection_threshold=rtt_detection_threshold)
                     if different_hops or increased_rtt:
-                        current_traceroute = schemas.TracerouteCreate(traceroute=raw_traceroute)
+                        current_traceroute = schemas.TracerouteCreate(raw_traceroute=raw_traceroute)
                         crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
                         logger.info('Updating traceroute for target "{0}".'.format(target.name))
                     else:
                         logger.debug('Current traceroute is identical to previous one for target "{0}". Nothing to do.'.format(target.name))
                 else:
-                    current_traceroute = schemas.TracerouteCreate(traceroute=raw_traceroute)
+                    current_traceroute = schemas.TracerouteCreate(raw_traceroute=raw_traceroute)
                     crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
                     logger.info('Created traceroute for target "{0}".'.format(target.name))
             else:
                 logger.error('Cannot get traceroute for target "{0}".'.format(target.name))
-                current_traceroute = schemas.TracerouteCreate(traceroute=raw_traceroute)
+                current_traceroute = schemas.TracerouteCreate(raw_traceroute=raw_traceroute)
                 crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
         except sqlalchemy.exc.OperationalError as exc:
             logger.error('sqlalchemy operation error: {0}.'.format(exc))
             logger.error('Trace:', exc_info=True)
 
 
-def get_last_traceroutes(name, limit=1):
+def get_last_traceroutes(target_name, limit=1):
     """
     Lists traceroute executions for a given target
 
@@ -279,16 +278,10 @@ def get_last_traceroutes(name, limit=1):
     :return: (list)(Traceroutes) list of traceroute object
 
     """
-    # Let's use a single global read session which we won't close so ORM objects are still mapped to session after usage
-    with db_scoped_session() as session:
-        try:
-            target = session.query(models.Target).filter(models.Target.name == name).one()
-        except sqlalchemy.orm.exc.NoResultFound:
-            return False
 
-        last_trace = session.query(models.Traceroute).filter(models.Traceroute.target == target).order_by(models.Traceroute.id.desc()).limit(
-            limit).all()
-        return last_trace
+    with db_scoped_session() as db:
+        traceroutes = crud.get_traceroutes_by_target(db=db, target_name=target_name, limit=limit)
+        return traceroutes
 
 
 def get_last_traceroutes_formatted(name, limit=1, formatting='console'):
@@ -316,39 +309,37 @@ def list_targets(include_tr: bool=False, formatting: str='console'):
 
     with db_scoped_session() as db:
         output = []
-        try:
-            targets = crud.get_targets(db=db)
-            for target in targets:
-                groups = crud.get_groups_by_target(db=db, target_id=target.id)
-                traces = get_last_traceroutes(target.name, limit=2)
-                try:
-                    current_tr = traces[0]
-                    current_tr_object = trparse.loads(current_tr.traceroute)
-                    current_rtt = int(current_tr_object.global_rtt)
-                except trparse.ParseError:
-                    current_rtt = None
-                try:
-                    previous_tr = traces[1]
-                    previous_tr_object = trparse.loads(previous_tr.traceroute)
-                    previous_rtt = int(previous_tr_object.global_rtt)
-                except (IndexError, trparse.ParseError):
-                    previous_tr = None
-                    previous_rtt = None
 
-                target = {'id': target.id, 'name': target.name, 'address': target.address, 'groups': [group.name for group in groups],
-                               'current_rtt': current_rtt, 'previous_rtt': previous_rtt,
-                               'last_check': current_tr.creation_date }
-                if include_tr:
-                    if previous_tr:
-                        target['current_tr'] = format_string(traceroutes_difference_preformatted(current_tr, previous_tr), formatting)
-                    else:
-                        target['current_tr'] = format_string(current_tr.traceroute, formatting)
+        targets = crud.get_targets(db=db)
+        for target in targets:
+            groups = crud.get_groups_by_target(db=db, target_id=target.id)
+            traces = get_last_traceroutes(target.name, limit=2)
+            try:
+                current_tr = traces[0]
+                current_tr_object = trparse.loads(current_tr.raw_traceroute)
+                current_rtt = int(current_tr_object.global_rtt)
+            except trparse.ParseError:
+                current_rtt = None
+            try:
+                previous_tr = traces[1]
+                previous_tr_object = trparse.loads(previous_tr.raw_traceroute)
+                previous_rtt = int(previous_tr_object.global_rtt)
+            except (IndexError, trparse.ParseError):
+                previous_tr = None
+                previous_rtt = None
+
+            target = {'id': target.id, 'name': target.name, 'address': target.address, 'groups': [group.name for group in groups],
+                           'current_rtt': current_rtt, 'previous_rtt': previous_rtt,
+                           'last_probe': current_tr.creation_date }
+            if include_tr:
+                if previous_tr:
+                    target['current_tr'] = format_string(traceroutes_difference_preformatted(current_tr, previous_tr), formatting)
+                else:
+                    target['current_tr'] = format_string(current_tr.raw_traceroute, formatting)
 
 
-                output.append(target)
-            return output
-        except sqlalchemy.orm.exc.NoResultFound:
-            return None
+            output.append(target)
+        return output
 
 
 def delete_old_traceroutes(target_name: str, days: int, keep: int):
@@ -432,8 +423,8 @@ def execute(daemon=False):
 
     for target_name in target_names:
         try:
-            tgt = schemas.TargetCreate(name=target_name, address=config['TARGET:' + target_name]['address'],
-                                   groups = config_management.get_groups_from_config(config, target_name))
+            grp = [schemas.GroupCreate(name=grp_name) for grp_name in config_management.get_groups_from_config(config, target_name)]
+            tgt = schemas.TargetCreate(name=str(target_name), address=config['TARGET:' + target_name]['address'], groups=grp)
 
             job_kwargs = {
                 'target': tgt
