@@ -63,6 +63,9 @@ def get_system_data():
 
 """
 Main API functions
+These aren't async since SQLAlchemy does not support async yet
+
+
 """
 @app.post('/target/', response_model=schemas.Target)
 def create_target(target: schemas.TargetCreate, db: Session = Depends(get_db)):
@@ -127,7 +130,7 @@ def create_traceroute_for_target(id: int, traceroute: schemas.TracerouteCreate, 
 def read_traceroutes_for_target(id: int, skip: int = 0, limit: int = None, db: Session = Depends(get_db)):
     return crud.get_traceroutes_by_target(db=db, target_id=id, skip=skip, limit=limit)
 
-@app.get('/traceroutes', response_model=schemas.Traceroute)
+@app.get('/traceroutes', response_model=List[schemas.Traceroute])
 def read_traceroutes(skip: int = 0, limit: int = None, db: Session = Depends(get_db)):
     traceroutes = crud.get_traceroutes(db=db, skip=skip, limit=limit)
     print(traceroutes)
