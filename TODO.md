@@ -15,6 +15,7 @@ v0.6.0
 v0.5.0
 - Add GUI using Jinja2
 - Get rid of UI spaghetti code for the scoped DB
+- Investigate usage of Tortoise ORM (see if that mitigates the Scoped session problem with SQLAlchemy/SQLite
 
 v0.4.0
 - Add CRUD API using FastAPI
