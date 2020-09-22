@@ -13,8 +13,11 @@ It can be run via cron / task scheduler or as service.
 1. Adjust the configuration file `traceroute_history.conf` according to your needs.
 2. Initialize the database
    `traceroute_history.py --config=traceroute_history.conf --init-db`
-3. Run via cron
-   `traceroute_history.py --config=traceroute_history.conf --update-now`
+3. Run as cron task with `traceroute_history.py --config=traceroute_history.conf --update-now`
+   
+   Example of a cron entry in /etc/crontab
+   
+   `30 * * * * root /usr/bin/python3 /opt/traceroute_history/traceroute_history.py --config=/opt/traceroute_history/traceroute_history.conf --update-now`
    
    or run as service
    `traceroute_history.py --config=traceroute_history.conf --daemon`
