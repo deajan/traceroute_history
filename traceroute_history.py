@@ -15,7 +15,7 @@ __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.4.0'
-__build__ = '2020092201'
+__build__ = '2020092202'
 
 import os
 import sys
@@ -317,14 +317,15 @@ def list_targets(include_tr: bool=False, formatting: str='console'):
             try:
                 current_tr = traces[0]
                 current_tr_object = trparse.loads(current_tr.raw_traceroute)
-                current_rtt = int(current_tr_object.global_rtt)
-            except trparse.ParseError:
+                current_rtt = float(current_tr_object.global_rtt)
+            # TypeError may happen if the traceroute could not be done, hence global.rtt does not contain an int type str
+            except (trparse.ParseError, TypeError):
                 current_rtt = None
             try:
                 previous_tr = traces[1]
                 previous_tr_object = trparse.loads(previous_tr.raw_traceroute)
-                previous_rtt = int(previous_tr_object.global_rtt)
-            except (IndexError, trparse.ParseError):
+                previous_rtt = float(previous_tr_object.global_rtt)
+            except (IndexError, trparse.ParseError, TypeError):
                 previous_tr = None
                 previous_rtt = None
 
