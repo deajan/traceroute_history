@@ -43,6 +43,7 @@ logger = ofunctions.logger_get_logger()
 
 # Default config file
 CONFIG_FILE = 'traceroute_history.conf'
+config = None
 
 
 def help_():
@@ -112,7 +113,7 @@ except KeyError:
 
 # Load database, needs to be done before accessing db_get function
 config = config_management.load_config('traceroute_history.conf')
-load_database(config)
+db_load_result = load_database(config)
 
 # Prepare FastAPI
 app = FastAPI()
@@ -229,6 +230,10 @@ GUI functions
 
 @app.get('/')
 async def index(request: Request):
+    if not config:
+        return {'message': 'Config not loaded'}
+    if not db_load_result:
+        return {'message': 'Cannot access DB: {}'.format(db_load_result)}
     targets = traceroute_history.list_targets(include_tr=True, formatting='web')
     return templates.TemplateResponse('targets.html',
                                       {'request': request, 'targets': targets, 'system': get_system_data()})
