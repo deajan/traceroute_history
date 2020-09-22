@@ -51,6 +51,11 @@ except KeyError:
 	bind_port = 5001
 	logger.info("Could not read bind port. Using default {}".format(bind_port))
 
+try:
+	sub_directory = config['UI_SETTINGS']['sub_directory']
+except KeyError:
+	sub_directory = ""
+
 
 app = FastAPI()
 templates = Jinja2Templates(directory='templates')
@@ -162,6 +167,9 @@ async def index(request: Request):
                                       {'request': request, 'targets': targets, 'system': get_system_data()})
 
 
+@app.get('/info')
+async def info(request: Request):
+    return {"message": "Hello", "root_path": request.scope.get("root_path")}
 
 if __name__ == '__main__':
-    uvicorn.run('user_interface:app', host=bind_to, port=bind_port, log_level='info', reload=True)
+    uvicorn.run('user_interface:app', host=bind_to, port=bind_port, log_level='info', root_path=sub_directory, reload=True)
