@@ -81,10 +81,10 @@
 									    modal.find('.modal-body').html('Are you sure you want to delete ' + button.data('name') + ' ? ');
 										modal.find('#cancel').show();
 										modal.find('#proceed').html('Proceed');
-									    //modal.find('#proceed').attr('href', ('/delete/' + button.data('id')));
+									    //modal.find('#proceed').attr('href', ('/target/' + button.data('id')));
 										modal.find('#proceed').off('click');
 										modal.find('#proceed').on('click', function () {
-										    location.href='/delete/' + button.data('id');
+										    location.href='/target/' + button.data('id');
 										});
 									}
 									if (modalType == 'info')
@@ -103,12 +103,12 @@
 								</script>
 									    
 								
-								<script src="assets/plugins/data-tables/jquery.datatables.min.js"></script>
-								<script src="assets/plugins/data-tables/datatables.bootstrap4.min.js"></script>
+								<script src="{{ url_for('assets', path='/plugins/data-tables/jquery.datatables.min.js') }}"></script>
+								<script src="{{ url_for('assets', path='/plugins/data-tables/datatables.bootstrap4.min.js') }}"></script>
 								  
 
 
-								<script src="assets/plugins/data-tables/datatables.responsive.min.js"></script>
+								<script src="{{ url_for('assets', path='/plugins/data-tables/datatables.responsive.min.js') }}"></script>
 								<script>
 								  jQuery(document).ready(function() {
 									jQuery('#responsive-data-table').DataTable({
