@@ -26,7 +26,7 @@ FQDN = constr(min_length=2, max_length=2083, strip_whitespace=True, regex=r'^(?!
 
 
 class TracerouteBase(BaseModel):
-    raw_traceroute: str = Field(..., description='Raw version of a traceroute', max_length=2048)
+    raw_traceroute: str = Field(..., description='Raw version of a traceroute', max_length=65535)
 
 
 class TracerouteCreate(TracerouteBase):
