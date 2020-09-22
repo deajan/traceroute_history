@@ -13,8 +13,8 @@ __intname__ = 'traceroute_history.user_interface'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.0'
-__build__ = '2020050601'
+__version__ = '0.4.1'
+__build__ = '2020092201'
 
 
 from typing import List
@@ -37,6 +37,20 @@ logger = ofunctions.logger_get_logger()
 # TODO conf file loader
 config = config_management.load_config('traceroute_history.conf')
 load_database(config)
+
+
+# Server variables
+try:
+	bind_to = config['UI_SETTINGS']['bind_to']
+except KeyError:
+	bind_to = '127.0.0.1'
+	logger.info("Could not read bind address. Using default {}".format(bind_to))
+try:
+	bind_port = int(config['UI_SETTINGS']['bind_port'])
+except KeyError:
+	bind_port = 5001
+	logger.info("Could not read bind port. Using default {}".format(bind_port))
+
 
 app = FastAPI()
 templates = Jinja2Templates(directory='templates')
@@ -150,4 +164,4 @@ async def index(request: Request):
 
 
 if __name__ == '__main__':
-    uvicorn.run('user_interface:app', host='127.0.0.1', port=5001, log_level='info', reload=True)
+    uvicorn.run('user_interface:app', host=bind_to, port=bind_port, log_level='info', reload=True)
