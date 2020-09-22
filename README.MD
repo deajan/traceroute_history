@@ -30,7 +30,16 @@ CLI can be executed directly via the script, eg:
 `traceroute_history.py --help`
 
 GUI relies on FastAPI and uvicorn modules.
-GUI can be launched via `user_interface.py` and will by default listen on 127.0.0.1:5001
+
+GUI can be launched via `user_interface.py` and will by default listen on 127.0.0.1:5001. Bind ip and port be modified in `traceroute_history.conf`.
+
+Additionnaly, a systemd file is provided for launching the user interface in `extras`
+
+```
+cp extras/traceroute_history_ui.service /usr/lib/systemd/system
+systemctl enable --now traceroute_history_ui
+systemctl status traceroute_history_ui
+```
 
 ![Test Image 1](current_ui_state.png)
    
