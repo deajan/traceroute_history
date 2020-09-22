@@ -13,10 +13,13 @@ __intname__ = 'traceroute_history.user_interface'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.1'
-__build__ = '2020092201'
+__version__ = '0.5.0'
+__build__ = '2020092202'
 
 
+import sys
+import os
+import getopt
 from typing import List
 from fastapi import Depends, FastAPI, Request, HTTPException
 from sqlalchemy.orm import Session
@@ -34,32 +37,88 @@ import config_management
 
 logger = ofunctions.logger_get_logger()
 
-# TODO conf file loader
-config = config_management.load_config('traceroute_history.conf')
-load_database(config)
 
+# TODO: because of get_db that must be initialized before everything, this is a bit of spaghetti code
+# best way to deal with it is to move config file and database loading to a module that needs to be called at the begin of code
+
+# Default config file
+CONFIG_FILE = 'traceroute_history.conf'
+
+
+def help_():
+    print('{} {} {}'.format(__intname__, __version__, __build__))
+    print('{} under {}'.format(__copyright__, __licence__))
+    print('')
+    print('Usage:')
+    print('{} [options]'.format(__file__))
+    print('')
+    print('Options:')
+    print('')
+    print(
+        '--config=                            Path to config file. If none given, traceroute_history.conf in the current directory is tried.')
+    sys.exit()
+
+
+def cmd_opts(argv):
+    global CONFIG_FILE
+    global config_file_set
+
+    try:
+        opts, _ = getopt.getopt(argv, "h?",
+                                ['config=', 'help'])
+    except getopt.GetoptError:
+        help_()
+        sys.exit(9)
+
+    config_file_set = False
+    for opt, arg in opts:
+        if opt == '--config':
+            CONFIG_FILE = arg
+            config_file_set = True
+
+
+cmd_opts(sys.argv[1:])
+
+
+# Reload config before executing anything elsee
+config = config_management.load_config(CONFIG_FILE)
+try:
+    log_file = config['TRACEROUTE_HISTORY']['log_file']
+    logger = ofunctions.logger_get_logger(log_file=log_file)
+except KeyError:
+    pass
+
+if not config_file_set:
+    logger.info('No config file set. trying default one: {0}.'.format(os.path.abspath(CONFIG_FILE)))
+
+logger.info('Running with database: {0}.'.format(config['TRACEROUTE_HISTORY']['database_host']))
 
 # Server variables
 try:
-	bind_to = config['UI_SETTINGS']['bind_to']
+    bind_to = config['UI_SETTINGS']['bind_to']
 except KeyError:
-	bind_to = '127.0.0.1'
-	logger.info("Could not read bind address. Using default {}".format(bind_to))
+    bind_to = '127.0.0.1'
+    logger.info("Could not read bind address. Using default {}".format(bind_to))
 try:
-	bind_port = int(config['UI_SETTINGS']['bind_port'])
+    bind_port = int(config['UI_SETTINGS']['bind_port'])
 except KeyError:
-	bind_port = 5001
-	logger.info("Could not read bind port. Using default {}".format(bind_port))
+    bind_port = 5001
+    logger.info("Could not read bind port. Using default {}".format(bind_port))
 
 try:
-	sub_directory = config['UI_SETTINGS']['sub_directory']
+   sub_directory = config['UI_SETTINGS']['sub_directory']
 except KeyError:
-	sub_directory = ""
+    sub_directory = ""
 
+# Load database, needs to be done before accessing db_get function
+config = config_management.load_config('traceroute_history.conf')
+load_database(config)
 
+# Prepare FastAPI
 app = FastAPI()
 templates = Jinja2Templates(directory='templates')
 app.mount('/assets', StaticFiles(directory='assets'), name='assets')
+
 
 
 def get_system_data():
@@ -171,5 +230,9 @@ async def index(request: Request):
 async def info(request: Request):
     return {"message": "Hello", "root_path": request.scope.get("root_path")}
 
+
 if __name__ == '__main__':
+    # Run the web server
     uvicorn.run('user_interface:app', host=bind_to, port=bind_port, log_level='info', root_path=sub_directory, reload=True)
+
+
