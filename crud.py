@@ -13,8 +13,8 @@ __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.0'
-__build__ = '2020050601'
+__version__ = '0.4.1'
+__build__ = '2020092201'
 
 
 from sqlalchemy.orm import Session
@@ -43,7 +43,8 @@ def create_target(db: Session, target: schemas.TargetCreate):
 def delete_target(db: Session, id: int = None, name: str = None):
     target = get_target(db, id, name)
     if target:
-        return db.delete(target)
+        db.delete(target)
+        return db.commit()
     return False
 
 
@@ -73,7 +74,8 @@ def create_group(db: Session, group: schemas.GroupCreate):
 def delete_group(db: Session, id: int = None, name: str = None):
     group = get_group(db, id, name)
     if group:
-        return db.delete(group)
+        db.delete(group)
+        return db.commit(group)
     return False
 
 
@@ -105,5 +107,6 @@ def delete_traceroute_by_target(db: Session, target_id: int = None, target_name:
     if target:
         traceroutes = get_traceroutes_by_target(db, target_id=target.id)
         for traceroute in traceroutes:
-            return db.delete(traceroute)
+            db.delete(traceroute)
+        return db.commit()
     return None
