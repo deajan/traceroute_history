@@ -15,7 +15,7 @@ __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.4.0'
-__build__ = '2020050601'
+__build__ = '2020092201'
 
 import os
 import sys
@@ -541,6 +541,7 @@ def main(argv):
             print(get_last_traceroutes_formatted(target, limit))
             sys.exit(0)
         if opt == '--list-targets':
+            print('List of current targets in database (not necessary in the config file:')
             print(json.dumps(list_targets(), indent=2, sort_keys=True, default=str))
             sys.exit(0)
         if opt == '--remove-target':
