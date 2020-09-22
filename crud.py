@@ -14,7 +14,7 @@ __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.4.1'
-__build__ = '2020092201'
+__build__ = '2020092202'
 
 
 from sqlalchemy.orm import Session
@@ -33,6 +33,9 @@ def get_targets(db: Session, skip: int = 0, limit: int = None):
 
 
 def create_target(db: Session, target: schemas.TargetCreate):
+    # Make IPv4 or IPv6 a string so SQLAlchemy is happy only being able to store a string
+    target.address = str(target.address)
+
     db_target = models.Target(name=target.name, address=target.address, groups=target.groups)
     db.add(db_target)
     db.commit()
