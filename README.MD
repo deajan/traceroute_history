@@ -9,7 +9,7 @@ It can be run via cron / task scheduler or as service.
 ## Setup
 
 0. Install development tools via `dnf install python3-devel gcc make`
-1. Install requirements via `pip -m install -r requirements.txt`
+1. Install requirements via `pip -m install -r requirements.txt` and `pip -m install -r requirements-python36.txt` if you run with Python 3.6
 1. Adjust the configuration file `traceroute_history.conf` according to your needs.
 2. Initialize the database
    `traceroute_history.py --config=traceroute_history.conf --init-db`
