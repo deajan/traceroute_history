@@ -14,7 +14,7 @@ __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.5.0'
-__build__ = '2020092202'
+__build__ = '2020092203'
 
 
 import sys
@@ -172,9 +172,17 @@ def read_target_by_name(name: str, db: Session = Depends(get_db)):
     return db_target
 
 @app.delete('/target/{id}')
-def delete_traceroute_by_id(id, db: Session = Depends(get_db)):
+def delete_traceroute_by_id(id: int, db: Session = Depends(get_db)):
     db_operation = crud.delete_target(db=db, id=id)
-    if db_operation is None:
+    if db_operation is not None:
+        raise HTTPException(status_code=404, detail='Target does not exist')
+    # deletes return HTTP 200 'null' on success
+    return db_operation
+
+@app.delete('/target/name/{name}')
+def delete_traceroute_by_name(name: str, db: Session = Depends(get_db)):
+    db_operation = crud.delete_target(db=db, name=name)
+    if db_operation is not None:
         raise HTTPException(status_code=404, detail='Target does not exist')
     return db_operation
 
