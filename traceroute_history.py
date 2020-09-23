@@ -14,8 +14,8 @@ __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.0'
-__build__ = '2020092202'
+__version__ = '0.4.1'
+__build__ = '2020092301'
 
 import os
 import sys
@@ -98,8 +98,17 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
     :param previous_tr: (str) raw traceroute output
     :return: (list) list of different indexes, or where rtt difference is higher than detection threshold
     """
-    current_tr_object = trparse.loads(current_tr)
-    previous_tr_object = trparse.loads(previous_tr)
+    try:
+        current_tr_object = trparse.loads(current_tr)
+    except trparse.InvalidHeader:
+        logger.warning('Cannot parse current tr') #TODO
+        return None, None
+
+    try:
+        previous_tr_object = trparse.loads(previous_tr)
+    except trparse.InvalidHeader:
+        logger.warning('Cannot parse previous tr') # TODO log
+        return None, None
 
     max_hops = max(len(current_tr_object.hops), len(previous_tr_object.hops))
 
@@ -171,13 +180,15 @@ def traceroutes_difference_preformatted(tr1: models.Traceroute, tr2: models.Trac
                 console_output = '{0}{1}\n'.format(console_output, line)
         return console_output
 
-    return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
+    try:
+        return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
                                                                                      _console_output(tr1.raw_traceroute,
                                                                                                      '{% START_COLOR_GREEN %}'),
                                                                                      tr2.creation_date,
                                                                                      _console_output(tr2.raw_traceroute,
                                                                                                      '{% START_COLOR_RED %}'))
-
+    except TypeError:
+        return 'Cannot parse TR' # TODO
 
 def os_traceroute(address):
     """
