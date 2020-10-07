@@ -5,3 +5,5 @@ flup[fcgi]>=1.0.3
 fastapi[ui]>=0.5.4
 uvicorn[ui]>=0.11.3
 psutil[ui]>=5.7.0
+aiofiles[ui]>=0.5.0
+jinja2[ui]>=2.11.2
