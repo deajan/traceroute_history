@@ -13,8 +13,8 @@ __intname__ = 'traceroute_history.user_interface'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.5.0'
-__build__ = '2020092203'
+__version__ = '0.5.1'
+__build__ = '2020100701'
 
 
 import sys
@@ -77,11 +77,9 @@ def cmd_opts(argv):
             CONFIG_FILE = arg
             config_file_set = True
 
-
 cmd_opts(sys.argv[1:])
 
-
-# Reload config before executing anything elsee
+# Reload config before executing anything else
 config = config_management.load_config(CONFIG_FILE)
 try:
     log_file = config['TRACEROUTE_HISTORY']['log_file']
@@ -112,14 +110,17 @@ except KeyError:
     sub_directory = ""
 
 # Load database, needs to be done before accessing db_get function
-config = config_management.load_config('traceroute_history.conf')
+#config = config_management.load_config('traceroute_history.conf')
 db_load_result = load_database(config)
 
 # Prepare FastAPI
 app = FastAPI()
-templates = Jinja2Templates(directory='templates')
-app.mount('/assets', StaticFiles(directory='assets'), name='assets')
 
+templates_path = os.path.join(config['TRACEROUTE_HISTORY']['install_dir'], 'www', 'templates')
+assets_path = os.path.join(config['TRACEROUTE_HISTORY']['install_dir'], 'www', 'assets')
+
+templates = Jinja2Templates(directory=templates_path)
+app.mount('/assets', StaticFiles(directory=assets_path), name='assets')
 
 
 def get_system_data():
