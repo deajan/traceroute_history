@@ -14,8 +14,8 @@ __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.1'
-__build__ = '2020092301'
+__version__ = '0.4.2'
+__build__ = '2020100701'
 
 import os
 import sys
@@ -94,20 +94,20 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
     Analyses two traceroutes for diffent hops, also checks for rtt increase
     Returns list of different hops and increased rtt times
 
-    :param current_tr: (str) raw traceeroute output
+    :param current_tr: (str) raw traceroute output
     :param previous_tr: (str) raw traceroute output
     :return: (list) list of different indexes, or where rtt difference is higher than detection threshold
     """
     try:
         current_tr_object = trparse.loads(current_tr)
     except trparse.InvalidHeader:
-        logger.warning('Cannot parse current tr') #TODO
+        logger.warning('Cannot parse current tr')
         return None, None
 
     try:
         previous_tr_object = trparse.loads(previous_tr)
     except trparse.InvalidHeader:
-        logger.warning('Cannot parse previous tr') # TODO log
+        logger.warning('Cannot parse previous tr')
         return None, None
 
     max_hops = max(len(current_tr_object.hops), len(previous_tr_object.hops))
@@ -261,7 +261,12 @@ def update_traceroute_database(target: schemas.TargetCreate):
                         logger.warning('Bogus rtt_detection_threshold value.')
                         rtt_detection_threshold = 0
                     different_hops, increased_rtt = analyze_traceroutes(raw_traceroute, previous_traceroute[0].raw_traceroute, rtt_detection_threshold=rtt_detection_threshold)
-                    if different_hops or increased_rtt:
+                    # Special case where previous traceroute is failed (traceroute binary missing) or unparseable
+                    if different_hops == None and increased_rtt == None:
+                        current_traceroute = schemas.TracerouteCreate(raw_traceroute=raw_traceroute)
+                        crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
+                        logger.info('Created traceroute for target "{0}" since previous traceroute is unparseable.'.format(target.name))
+                    elif different_hops or increased_rtt:
                         current_traceroute = schemas.TracerouteCreate(raw_traceroute=raw_traceroute)
                         crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
                         logger.info('Updating traceroute for target "{0}".'.format(target.name))
