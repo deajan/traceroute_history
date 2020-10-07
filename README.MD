@@ -8,7 +8,7 @@ It can be run via cron / task scheduler or as service.
 
 ## Setup
 
-1. Install traceroute binary via `dnf install traceroute`
+1. Install traceroute binary via `dnf install traceroute`. On Windows, binary `tracert` should be included in system32 directory.
 1. Install development tools via `dnf install python3-devel gcc make` in order to compile required python modules.
 2. Install requirements via `pip -m install -r requirements.txt` and `pip -m install -r requirements-python36.txt` if you run with Python 3.6
 3. Adjust the configuration file `traceroute_history.conf` according to your needs.
