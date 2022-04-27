@@ -44,10 +44,12 @@ systemctl status traceroute_history_ui
 
 ![Test Image 1](current_ui_state.png)
    
-## Smokeping integration
+## Smokeping integration - Webserver
 
 Traceroute History can directly read smokeping configuration files in order to add them as probe targets.
 It also provides a FastCGI script that can be directly integrated into smokeping:
+
+### Apache
 
 In your smokeping virtualhost add
 
@@ -58,6 +60,53 @@ In your smokeping virtualhost add
 
 Alias /smokeping_th_helper.fcgi /path/to/traceroute_history/smokeping_th_helper.fgci
 ```
+
+### Nginx
+
+You need to install fcgiwrap for CGI wrapper interact with Nginx:
+
+* Debian/Ubuntu: `apt install fcgiwrap`
+* CentOS/RHEL: `yum install fcgiwrap`
+
+Then configure Nginx with the default configuration:
+
+`cp /usr/share/doc/fcgiwrap/examples/nginx.conf /etc/nginx/fcgiwrap.conf`
+
+Make symbolic link for smokeping_th_helper.fcgi:
+
+`ln': ln -s /opt/traceroute_history/smokeping_th_helper.fcgi /usr/lib/cgi-bin/smokeping_th_helper.fcgi`
+
+In your smokeping virtualhost add
+
+```
+location = /smokeping/smokeping_th_helper.fcgi {
+        alias /opt/traceroute_history/smokeping_th_helper.fcgi;
+
+        fastcgi_intercept_errors on;
+
+        fastcgi_param   SCRIPT_FILENAME         /usr/lib/cgi-bin/smokeping_th_helper.fcgi;
+        fastcgi_param   QUERY_STRING            $query_string;
+        fastcgi_param   REQUEST_METHOD          $request_method;
+        fastcgi_param   CONTENT_TYPE            $content_type;
+        fastcgi_param   CONTENT_LENGTH          $content_length;
+        fastcgi_param   REQUEST_URI             $request_uri;
+        fastcgi_param   DOCUMENT_URI            $document_uri;
+        fastcgi_param   DOCUMENT_ROOT           $document_root;
+        fastcgi_param   SERVER_PROTOCOL         $server_protocol;
+        fastcgi_param   GATEWAY_INTERFACE       CGI/1.1;
+        fastcgi_param   SERVER_SOFTWARE         nginx/$nginx_version;
+        fastcgi_param   REMOTE_ADDR             $remote_addr;
+        fastcgi_param   REMOTE_PORT             $remote_port;
+        fastcgi_param   SERVER_ADDR             $server_addr;
+        fastcgi_param   SERVER_PORT             $server_port;
+        fastcgi_param   SERVER_NAME             $server_name;
+        fastcgi_param   HTTPS                   $https if_not_empty;
+
+        fastcgi_pass unix:/var/run/fcgiwrap.socket;
+}
+```
+
+## Smokeping integration - HTML
 
 In your smokeping basepage.html file (generally in /opt/smokeping/etc), add the `smokeping_th_helper.js` script after the other scripts.
 Your source should look like: 
