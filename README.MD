@@ -13,22 +13,22 @@ It can be run via cron / task scheduler or as service.
 2. Install requirements via `pip -m install -r requirements.txt` and `pip -m install -r requirements-python36.txt` if you run with Python 3.6
 3. Adjust the configuration file `traceroute_history.conf` according to your needs.
 4. Initialize the database
-   `traceroute_history.py --config=traceroute_history.conf --init-db`
-5. Run as cron task with `traceroute_history.py --config=traceroute_history.conf --update-now`
+   `traceroute_history_runner.py --config=traceroute_history.conf --init-db`
+5. Run as cron task with `traceroute_history_runner.py --config=traceroute_history.conf --update-now`
    
    Example of a cron entry in /etc/crontab
    
-   `30 * * * * root /usr/bin/python3 /opt/traceroute_history/traceroute_history.py --config=/opt/traceroute_history/traceroute_history.conf --update-now`
+   `30 * * * * root /usr/bin/python3 /opt/traceroute_history/traceroute_history_runner.py --config=/opt/traceroute_history/traceroute_history.conf --update-now`
    
    or run as service
-   `traceroute_history.py --config=traceroute_history.conf --daemon`
+   `traceroute_history_runner.py --config=traceroute_history.conf --daemon`
 
 ## User interface
 
 There's currently a CLI and a GUI interface available.
 CLI can be executed directly via the script, eg:
 
-`traceroute_history.py --help`
+`traceroute_history_runner.py --help`
 
 GUI relies on FastAPI and uvicorn modules.
 

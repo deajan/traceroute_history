@@ -13,8 +13,8 @@ __intname__ = 'traceroute_history.user_interface'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.5.1'
-__build__ = '2020100701'
+__version__ = '0.5.12-dev'
+__build__ = '2022050501'
 
 
 import sys
@@ -27,12 +27,12 @@ import uvicorn
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import psutil
-import ofunctions
+import ofunctions.logger_utils
 from traceroute_history.database import load_database, get_db
-from traceroute_history.traceroute_history import config_management, schemas, crud
-from traceroute_history import traceroute_history
+from traceroute_history.traceroute_history_runner import config_management, schemas, crud
+from traceroute_history import traceroute_history_runner
 
-logger = ofunctions.logger_get_logger()
+logger = ofunctions.logger_utils.logger_get_logger()
 
 
 # TODO: because of get_db that must be initialized before everything, this is a bit of spaghetti code
@@ -80,7 +80,7 @@ cmd_opts(sys.argv[1:])
 config = config_management.load_config(CONFIG_FILE)
 try:
     log_file = config['TRACEROUTE_HISTORY']['log_file']
-    logger = ofunctions.logger_get_logger(log_file=log_file)
+    logger = ofunctions.logger_utils.logger_get_logger(log_file=log_file)
 except KeyError:
     pass
 
@@ -113,8 +113,8 @@ db_load_result = load_database(config)
 # Prepare FastAPI
 app = FastAPI()
 
-templates_path = os.path.join(config['TRACEROUTE_HISTORY']['install_dir'], 'www', 'templates')
-assets_path = os.path.join(config['TRACEROUTE_HISTORY']['install_dir'], 'www', 'assets')
+templates_path = os.path.join(config['TRACEROUTE_HISTORY']['install_dir'], 'traceroute_history', 'www', 'templates')
+assets_path = os.path.join(config['TRACEROUTE_HISTORY']['install_dir'], 'traceroute_history', 'www', 'assets')
 
 templates = Jinja2Templates(directory=templates_path)
 app.mount('/assets', StaticFiles(directory=assets_path), name='assets')
@@ -133,7 +133,7 @@ def get_system_data():
     return {
         'cpu': cpu,
         'memory': memory,
-        'version': traceroute_history.__version__,
+        'version': traceroute_history_runner.__version__,
         'ui_version': __version__,
     }
 
@@ -232,7 +232,7 @@ async def index(request: Request):
         return {'message': 'Config not loaded'}
     if not db_load_result:
         return {'message': 'Cannot access DB: {}'.format(db_load_result)}
-    targets = traceroute_history.list_targets(include_tr=True, formatting='web')
+    targets = traceroute_history_runner.list_targets(include_tr=True, formatting='web')
     return templates.TemplateResponse('targets.html',
                                       {'request': request, 'targets': targets, 'system': get_system_data()})
 

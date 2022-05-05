@@ -10,7 +10,7 @@ Also happens to read smokeping configuration files to populate targets to probe
 
 """
 
-__intname__ = 'traceroute_history'
+__intname__ = 'traceroute_history.runner'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020-2022 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
@@ -20,7 +20,7 @@ __build__ = '2022050501'
 import os
 import sys
 import getopt
-import ofunctions
+import ofunctions.logger_utils
 from apscheduler.schedulers.background import BackgroundScheduler
 from time import sleep
 from sqlalchemy import and_
@@ -44,7 +44,7 @@ except ImportError:
 CONFIG_FILE = 'traceroute_history.conf'
 
 LOG_FILE = os.path.join(os.path.dirname(__file__), os.path.splitext(os.path.basename(__file__))[0]) + '.log'
-logger = ofunctions.logger_get_logger(log_file=LOG_FILE)
+logger = ofunctions.logger_utils.logger_get_logger(log_file=LOG_FILE)
 
 
 def format_string(string: str, formatting: str='console'):
@@ -524,7 +524,7 @@ def main(argv):
     config = config_management.load_config(CONFIG_FILE)
     try:
         log_file = config['TRACEROUTE_HISTORY']['log_file']
-        logger = ofunctions.logger_get_logger(log_file=log_file)
+        logger = ofunctions.logger_utils.logger_get_logger(log_file=log_file)
     except KeyError:
         pass
 
