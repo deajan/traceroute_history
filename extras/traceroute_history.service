@@ -4,7 +4,7 @@ After=network-online.target multi-user.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 /opt/traceroute_history/traceroute_history.py --config=/opt/traceroute_history/traceroute_history.conf --daemon
+ExecStart=/usr/bin/env python3 /opt/traceroute_history/traceroute_history.py --config=/opt/traceroute_history/traceroute_history.conf --daemon
 WorkingDirectory=/opt/traceroute_history
 StandardError=syslog
 PIDFile=/var/run/traceroute_history.pid
