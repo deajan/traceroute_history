@@ -15,27 +15,27 @@
 
 
   <!-- PLUGINS CSS STYLE -->
-  <link href="assets/plugins/nprogress/nprogress.css" rel="stylesheet" />
+  <link href="{{ url_for('assets', path='/plugins/nprogress/nprogress.css') }}" rel="stylesheet" />
 
   
   
-  <link href="assets/plugins/daterangepicker/daterangepicker.css" rel="stylesheet" />
+  <link href="{{ url_for('assets', path='/plugins/daterangepicker/daterangepicker.css') }}" rel="stylesheet" />
   
   
   
-  <link href="assets/plugins/data-tables/datatables.bootstrap4.min.css" rel="stylesheet" />
+  <link href="{{ url_for('assets', path='/plugins/data-tables/datatables.bootstrap4.min.css') }}" rel="stylesheet" />
   
   
   
-  <link href="assets/plugins/data-tables/responsive.datatables.min.css" rel="stylesheet" />
+  <link href="{{ url_for('assets', path='/plugins/data-tables/responsive.datatables.min.css') }}" rel="stylesheet" />
   
   
 
   <!-- SLEEK CSS -->
-  <link id="sleek-css" rel="stylesheet" href="assets/css/sleek.css" />
+  <link id="sleek-css" rel="stylesheet" href="{{ url_for('assets', path='/css/sleek.css') }}" />
 
   <!-- FAVICON -->
-  <link href="assets/img/favicon.png" rel="shortcut icon" />
+  <link href="{{ url_for('assets', path='/img/favicon.png') }}" rel="shortcut icon" />
 
   
 
@@ -47,10 +47,10 @@
     <script src="https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js"></script>
     <script src="https://oss.maxcdn.com/respond/1.4.2/respond.min.js"></script>
   <![endif]-->
-  <script src="assets/plugins/nprogress/nprogress.js"></script>
-  <script src="assets/plugins/jquery/jquery.min.js"></script>
-  <script src="assets/plugins/slimscrollbar/jquery.slimscroll.min.js"></script>
-  <script src="assets/plugins/jekyll-search.min.js"></script>
+  <script src="{{ url_for('assets', path='/plugins/nprogress/nprogress.js') }}"></script>
+  <script src="{{ url_for('assets', path='/plugins/jquery/jquery.min.js') }}"></script>
+  <script src="{{ url_for('assets', path='/plugins/slimscrollbar/jquery.slimscroll.min.js') }}"></script>
+  <script src="{{ url_for('assets', path='/plugins/jekyll-search.min.js') }}"></script>
 </head>
 
 
@@ -119,8 +119,8 @@
 
 
 
-<script src="assets/plugins/daterangepicker/moment.min.js"></script>
-<script src="assets/plugins/daterangepicker/daterangepicker.js"></script>
+<script src="{{ url_for('assets', path='/plugins/daterangepicker/moment.min.js') }}"></script>
+<script src="{{ url_for('assets', path='/plugins/daterangepicker/daterangepicker.js') }}"></script>
 <script>
   jQuery(document).ready(function() {
     jQuery('input[name="dateRange"]').daterangepicker({
@@ -139,7 +139,7 @@
   });
 </script>
 
-<script src="assets/js/sleek.bundle.js"></script>
+<script src="{{ url_for('assets', path='/js/sleek.bundle.js') }}"></script>
 </body>
 
 </html>

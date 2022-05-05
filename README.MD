@@ -8,12 +8,13 @@ It can be run via cron / task scheduler or as service.
 
 ## Setup
 
-0. Install development tools via `dnf install python3-devel gcc make`
-1. Install requirements via `pip -m install -r requirements.txt`
-1. Adjust the configuration file `traceroute_history.conf` according to your needs.
-2. Initialize the database
+1. Install traceroute binary via `dnf install traceroute`. On Windows, binary `tracert` should be included in system32 directory.
+1. Install development tools via `dnf install python3-devel gcc make` in order to compile required python modules.
+2. Install requirements via `pip -m install -r requirements.txt` and `pip -m install -r requirements-python36.txt` if you run with Python 3.6
+3. Adjust the configuration file `traceroute_history.conf` according to your needs.
+4. Initialize the database
    `traceroute_history.py --config=traceroute_history.conf --init-db`
-3. Run as cron task with `traceroute_history.py --config=traceroute_history.conf --update-now`
+5. Run as cron task with `traceroute_history.py --config=traceroute_history.conf --update-now`
    
    Example of a cron entry in /etc/crontab
    
@@ -30,7 +31,16 @@ CLI can be executed directly via the script, eg:
 `traceroute_history.py --help`
 
 GUI relies on FastAPI and uvicorn modules.
-GUI can be launched via `user_interface.py` and will by default listen on 127.0.0.1:5001
+
+GUI can be launched via `user_interface.py` and will by default listen on 127.0.0.1:5001. Bind ip and port be modified in `traceroute_history.conf`.
+
+Additionnaly, a systemd file is provided for launching the user interface in `extras`
+
+```
+cp extras/traceroute_history_ui.service /usr/lib/systemd/system
+systemctl enable --now traceroute_history_ui
+systemctl status traceroute_history_ui
+```
 
 ![Test Image 1](current_ui_state.png)
    

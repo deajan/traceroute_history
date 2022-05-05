@@ -116,3 +116,4 @@ def load_database(config, initialize=False):
             return SessionLocal
         except sqlalchemy.exc.OperationalError:
             logger.critical('Cannot connect to database "{0}".'.format(db_host), exc_info=True)
+            return None

@@ -13,17 +13,18 @@ __intname__ = 'traceroute_history.config_management'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.0'
-__build__ = '2020050601'
+__version__ = '0.4.1'
+__build__ = '2020100701'
 
 import os
 import sys
 from logging import getLogger
 import re
 import configparser
-
+import exceptions
 
 logger = getLogger(__name__)
+
 
 def load_config(config_file):
     """
@@ -34,15 +35,12 @@ def load_config(config_file):
     global CONFIG
 
     if config_file is None or not os.path.isfile(config_file):
-        print(
-            'Cannot load configuration file "{0}". Please use --config=[config file].'.format(config_file))
-        sys.exit(10)
+        raise exceptions.ConfigFileNotFound("Cannot load config file {}".format(config_file))
     config = configparser.ConfigParser()
     try:
         config.read(config_file)
     except (configparser.MissingSectionHeaderError, KeyError):
-        print('Unknown database configuration.')
-        sys.exit(12)
+        raise exceptions.ConfigFileNotParseable("Config file {} is not parseable.".format(config_file))
     return config
 
 

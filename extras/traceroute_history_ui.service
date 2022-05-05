@@ -1,0 +1,15 @@
+[Unit]
+Description=Traceroute History Web UI Server
+After=network-online.target multi-user.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/traceroute_history/user_interface.py --config=/opt/traceroute_history/traceroute_history.conf
+WorkingDirectory=/opt/traceroute_history
+StandardError=syslog
+PIDFile=/var/run/traceroute_history_ui.pid
+Restart=on-failure
+RestartSec=3600s
+
+[Install]
+WantedBy=multi-user.target

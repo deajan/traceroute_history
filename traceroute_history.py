@@ -14,8 +14,8 @@ __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.0'
-__build__ = '2020050601'
+__version__ = '0.4.2'
+__build__ = '2020100701'
 
 import os
 import sys
@@ -94,12 +94,21 @@ def analyze_traceroutes(current_tr: str, previous_tr: str, rtt_detection_thresho
     Analyses two traceroutes for diffent hops, also checks for rtt increase
     Returns list of different hops and increased rtt times
 
-    :param current_tr: (str) raw traceeroute output
+    :param current_tr: (str) raw traceroute output
     :param previous_tr: (str) raw traceroute output
     :return: (list) list of different indexes, or where rtt difference is higher than detection threshold
     """
-    current_tr_object = trparse.loads(current_tr)
-    previous_tr_object = trparse.loads(previous_tr)
+    try:
+        current_tr_object = trparse.loads(current_tr)
+    except trparse.InvalidHeader:
+        logger.warning('Cannot parse current tr')
+        return None, None
+
+    try:
+        previous_tr_object = trparse.loads(previous_tr)
+    except trparse.InvalidHeader:
+        logger.warning('Cannot parse previous tr')
+        return None, None
 
     max_hops = max(len(current_tr_object.hops), len(previous_tr_object.hops))
 
@@ -171,13 +180,15 @@ def traceroutes_difference_preformatted(tr1: models.Traceroute, tr2: models.Trac
                 console_output = '{0}{1}\n'.format(console_output, line)
         return console_output
 
-    return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
+    try:
+        return 'Traceroute recorded at {0}:\n{1}Traceroute recorded at {2}:\n{3}'.format(tr1.creation_date,
                                                                                      _console_output(tr1.raw_traceroute,
                                                                                                      '{% START_COLOR_GREEN %}'),
                                                                                      tr2.creation_date,
                                                                                      _console_output(tr2.raw_traceroute,
                                                                                                      '{% START_COLOR_RED %}'))
-
+    except TypeError:
+        return 'Cannot parse TR' # TODO
 
 def os_traceroute(address):
     """
@@ -250,7 +261,12 @@ def update_traceroute_database(target: schemas.TargetCreate):
                         logger.warning('Bogus rtt_detection_threshold value.')
                         rtt_detection_threshold = 0
                     different_hops, increased_rtt = analyze_traceroutes(raw_traceroute, previous_traceroute[0].raw_traceroute, rtt_detection_threshold=rtt_detection_threshold)
-                    if different_hops or increased_rtt:
+                    # Special case where previous traceroute is failed (traceroute binary missing) or unparseable
+                    if different_hops == None and increased_rtt == None:
+                        current_traceroute = schemas.TracerouteCreate(raw_traceroute=raw_traceroute)
+                        crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
+                        logger.info('Created traceroute for target "{0}" since previous traceroute is unparseable.'.format(target.name))
+                    elif different_hops or increased_rtt:
                         current_traceroute = schemas.TracerouteCreate(raw_traceroute=raw_traceroute)
                         crud.create_target_traceroute(db=db, traceroute=current_traceroute, target_id=target.id)
                         logger.info('Updating traceroute for target "{0}".'.format(target.name))
@@ -317,14 +333,15 @@ def list_targets(include_tr: bool=False, formatting: str='console'):
             try:
                 current_tr = traces[0]
                 current_tr_object = trparse.loads(current_tr.raw_traceroute)
-                current_rtt = int(current_tr_object.global_rtt)
-            except trparse.ParseError:
+                current_rtt = float(current_tr_object.global_rtt)
+            # TypeError may happen if the traceroute could not be done, hence global.rtt does not contain an int type str
+            except (trparse.ParseError, TypeError):
                 current_rtt = None
             try:
                 previous_tr = traces[1]
                 previous_tr_object = trparse.loads(previous_tr.raw_traceroute)
-                previous_rtt = int(previous_tr_object.global_rtt)
-            except (IndexError, trparse.ParseError):
+                previous_rtt = float(previous_tr_object.global_rtt)
+            except (IndexError, trparse.ParseError, TypeError):
                 previous_tr = None
                 previous_rtt = None
 
@@ -541,6 +558,7 @@ def main(argv):
             print(get_last_traceroutes_formatted(target, limit))
             sys.exit(0)
         if opt == '--list-targets':
+            print('List of current targets in database (not necessary in the config file:')
             print(json.dumps(list_targets(), indent=2, sort_keys=True, default=str))
             sys.exit(0)
         if opt == '--remove-target':
