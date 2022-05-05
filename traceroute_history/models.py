@@ -20,8 +20,10 @@ __build__ = '2020050601'
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from traceroute_history.database import Base
+#from traceroute_history.database import Base
+from sqlalchemy.ext.declarative import declarative_base
 
+Base = declarative_base()
 
 class Traceroute(Base):
     __tablename__ = 'traceroute'

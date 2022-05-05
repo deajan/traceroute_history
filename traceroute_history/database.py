@@ -20,7 +20,6 @@ import os
 import sys
 from logging import getLogger
 from sqlalchemy import create_engine
-from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, scoped_session
 import sqlalchemy.exc
 from contextlib import contextmanager
@@ -30,7 +29,6 @@ from traceroute_history import models
 logger = getLogger(__name__)
 
 
-Base = declarative_base()
 SessionLocal = None
 
 # Dependency for FastAPI
