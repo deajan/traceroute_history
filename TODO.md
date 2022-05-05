@@ -1,6 +1,6 @@
 ## What's missing
 
-Roadmap (we are currently heading towars v0.5.0)
+Roadmap (we are currently heading towards v0.5.0)
 
 Future
 - Add an alternate internal traceroute implementation that is capable of TCP, UDP and ICMP protocols
