@@ -23,17 +23,14 @@ import getopt
 from typing import List
 from fastapi import Depends, FastAPI, Request, HTTPException
 from sqlalchemy.orm import Session
-import crud
-import schemas
-from database import db_scoped_session
 import uvicorn
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 import psutil
 import ofunctions
-import traceroute_history
-from database import load_database, get_db
-import config_management
+from traceroute_history.database import load_database, get_db
+from traceroute_history.traceroute_history import config_management, schemas, crud
+from traceroute_history import traceroute_history
 
 logger = ofunctions.logger_get_logger()
 

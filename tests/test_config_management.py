@@ -16,7 +16,7 @@ __copyright__ = "Copyright (C) 2022 Orsiris de Jong"
 __licence__ = "BSD 3 Clause"
 __build__ = "2022050501"
 
-import config_management
+from traceroute_history import config_management
 
 
 def test_read_smokeping_config():

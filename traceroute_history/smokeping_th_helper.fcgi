@@ -19,7 +19,7 @@ from flup.server.fcgi import WSGIServer
 
 # Make sure we import traceroute_history module that resides in the same path as current fcgi script
 sys.path.append(os.path.join(os.path.dirname(__file__)))
-import traceroute_history
+from traceroute_history import traceroute_history
 
 GET = {}
 

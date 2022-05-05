@@ -20,7 +20,7 @@ __build__ = '2020050601'
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from database import Base
+from traceroute_history.database import Base
 
 
 class Traceroute(Base):

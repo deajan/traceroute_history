@@ -27,15 +27,11 @@ from sqlalchemy import and_
 import sqlalchemy.exc
 from datetime import datetime, timedelta
 from command_runner import command_runner
-import trparse
 import json
 from decimal import Decimal
-import crud
-import models
-import schemas
-import config_management
+from traceroute_history import config_management, trparse, schemas, models, crud
 from pydantic import ValidationError
-from database import load_database, db_scoped_session
+from traceroute_history.database import load_database, db_scoped_session
 
 # colorama is not mandatory
 try:
@@ -382,7 +378,7 @@ def delete_old_traceroutes(target_name: str, days: int, keep: int):
 
             # Subquery is needed because we cannot use delete() on a query with a limit
             subquery = db.query(models.Traceroute.id).filter(and_(models.Traceroute.target == target,
-                                                                models.Traceroute.creation_date < (datetime.now() - timedelta(
+                                                                  models.Traceroute.creation_date < (datetime.now() - timedelta(
                                                                     days=days)))).order_by(models.Traceroute.id.desc()).limit(
                 num_records_to_delete).subquery()
             records = db.query(models.Traceroute).filter(models.Traceroute.id.in_(subquery)).delete(synchronize_session='fetch')

@@ -18,8 +18,8 @@ __build__ = '2020092202'
 
 
 from sqlalchemy.orm import Session
-import models
-import schemas
+from traceroute_history import schemas, models
+
 
 def get_target(db: Session, id: int = None, name: str = None):
     if id:
@@ -88,7 +88,8 @@ def get_traceroutes_by_target(db: Session, target_id: int = None, target_name: s
         if count:
             return db.query(models.Traceroute).filter(models.Traceroute.target == target).count()
         else:
-            return db.query(models.Traceroute).filter(models.Traceroute.target == target).order_by(models.Traceroute.id.desc()).limit(limit).offset(skip).all()
+            return db.query(models.Traceroute).filter(models.Traceroute.target == target).order_by(
+                models.Traceroute.id.desc()).limit(limit).offset(skip).all()
     else:
         return None
 

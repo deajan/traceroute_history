@@ -20,7 +20,7 @@ import os
 from logging import getLogger
 import re
 import configparser
-import exceptions
+from traceroute_history import exceptions
 
 logger = getLogger(__name__)
 

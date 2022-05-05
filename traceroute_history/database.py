@@ -25,8 +25,7 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 import sqlalchemy.exc
 from contextlib import contextmanager
 import urllib.parse
-import models
-
+from traceroute_history import models
 
 logger = getLogger(__name__)
 
