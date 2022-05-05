@@ -12,10 +12,10 @@ Also happens to read smokeping configuration files to populate targets to probe
 
 __intname__ = 'traceroute_history'
 __author__ = 'Orsiris de Jong'
-__copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
+__copyright__ = 'Copyright (C) 2020-2022 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.2'
-__build__ = '2020100701'
+__version__ = '0.5.0-dev'
+__build__ = '2022050501'
 
 import os
 import sys
