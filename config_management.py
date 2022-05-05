@@ -11,19 +11,23 @@ config_management handles all necessary connections to config files
 
 __intname__ = 'traceroute_history.config_management'
 __author__ = 'Orsiris de Jong'
-__copyright__ = 'Copyright (C) 2020 Orsiris de Jong'
+__copyright__ = 'Copyright (C) 2020-2022 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
-__version__ = '0.4.1'
-__build__ = '2020100701'
+__version__ = '0.5.0-dev'
+__build__ = '2022050501'
 
 import os
-import sys
 from logging import getLogger
 import re
 import configparser
 import exceptions
 
 logger = getLogger(__name__)
+
+# Don't add $ since we could have some comments afterwards
+COMMENT_REGEX = re.compile(r"\s*#")
+SMOKEPING_TARGET_REGEX = re.compile(r'.*host\s*=\s*(\S*)', re.IGNORECASE)
+SMOKEPING_TITLE_REGEX = re.compile(r'.*title\s*=\s*(.*)$', re.IGNORECASE)
 
 
 def load_config(config_file):
@@ -62,43 +66,107 @@ def save_config(config_file, config):
         logger.critical('Cannot save configuration file. {}'.format(exc))
         return False
 
+def read_include_file(include_file):
+    """
+    Read smokeping include files
+    """
+
+    targets = []
+    target_names = []
+
+    with open(include_file, 'r', encoding="utf-8") as smokeping_include_config:
+        for line in smokeping_include_config:
+            target = re.match(SMOKEPING_TARGET_REGEX, line)
+            target_name = re.match(SMOKEPING_TITLE_REGEX, line)
+            if target:
+                targets.append(target)
+            if target_name:
+                target_names.append(target_name)
+    return targets, target_names
 
 def read_smokeping_config(config_file):
     """
     Read smokeping config file
-    TODO: does not support missing title or target directives (will shift values)
 
     :param config_file: (str) path to config file
     :return: (list)(dict) [{'target': x, 'title': y}]
     """
+
     if config_file == '':
         return None
     if not os.path.isfile(config_file):
         logger.error('smokeping config "{0}" does not seem to be a file.'.format(config_file))
         return None
 
-    target_regex = re.compile(r'^host\s*=\s*(\S*)$')
-    title_regex = re.compile(r'^title\s*=\s*(.*)$')
+    targets = {}
+    target_names = {}
 
-    targets = []
-    target_names = []
+    targets_section = False
+    host_counter = 0
 
     with open(config_file, 'r') as smokeping_config:
         for line in smokeping_config:
-            target = re.match(target_regex, line)
-            target_name = re.match(title_regex, line)
-            if target:
-                targets.append(target)
-            if target_name:
-                target_names.append(target_name)
+            # Remove EOL
+            line = line.rstrip()
 
-    if len(targets) != len(target_names):
-        logger.error('Cannot parse smokeping config file. We need as much titles as host entries.')
-        return None
+            # Walk file until we hit targets section
+            if line == "*** Targets ***":
+                targets_section = True
+                continue
+            if not targets_section:
+                continue
+            # Stop reading file after another section is reached
+            if line.startswith("*** "):
+                targets_section = False
+                continue
+
+            if line.startswith("@include"):
+                _, include_path = line.split("@include ")
+
+                # Try to resolve abs filename, if not, try local
+                if not os.path.isfile(include_path):
+                    include_path = os.path.join(os.path.dirname(config_file), os.path.basename(include_path))
+
+                with open(include_path, 'r') as include_file:
+                    iterator = include_file.readlines()
+            else:
+                iterator = [line]
+
+            for ln in iterator:
+                # Remove EOL (again, but may be from include file this time)
+                ln = ln.rstrip()
+
+                # Let's begin searching for hosts, we'll get
+                if ln.startswith("+"):
+                    host_counter += 1
+
+                if re.match(COMMENT_REGEX, ln):
+                    continue
+                target = re.match(SMOKEPING_TARGET_REGEX, ln)
+                target_name = re.match(SMOKEPING_TITLE_REGEX, ln)
+
+                if target:
+                    targets[host_counter] = target.group(1)
+                if target_name:
+                    target_names[host_counter] = target_name.group(1)
+
 
     # TODO Add regex for group inclusion / exclusion
 
-    return [{'target': target, 'name': name} for target, name in zip(targets, target_names)]
+    # Merge targets and names into list when target host exists
+    target_list = []
+    for count in range(1, host_counter + 1):
+        try:
+            tgt = {'target': targets[count]}
+        except KeyError:
+            continue
+        try:
+            tgt['name'] = target_names[count]
+        except KeyError:
+            pass
+        target_list.append(tgt)
+
+    return target_list
 
 
 def get_targets_from_config(config):
