@@ -15,10 +15,10 @@ import sys
 import getopt
 import cgi
 from flup.server.fcgi import WSGIServer
-#from traceroute_history.traceroute_history import get_last_traceroutes
 
 # Make sure we import traceroute_history module that resides in the same path as current fcgi script
-sys.path.append(os.path.join(os.path.dirname(__file__)))
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), os.pardir)))
+
 from traceroute_history import traceroute_history_runner
 
 GET = {}
