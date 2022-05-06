@@ -14,7 +14,7 @@ __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020-2022 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.5.0-dev'
-__build__ = '2022050501'
+__build__ = '2022050601'
 
 import os
 from logging import getLogger
@@ -157,7 +157,7 @@ def read_smokeping_config(config_file):
     target_list = []
     for count in range(1, host_counter + 1):
         try:
-            tgt = {'target': targets[count]}
+            tgt = {'address': targets[count]}
         except KeyError:
             continue
         try:
@@ -170,7 +170,14 @@ def read_smokeping_config(config_file):
 
 
 def get_targets_from_config(config):
-    targets = [section.lstrip('TARGET:') for section in config.sections() if section.startswith('TARGET:')]
+    targets = []
+    for section in config.sections():
+        if section.startswith("TARGET:"):
+            target = {}
+            target['name'] = section.lstrip("TARGET:")
+            target['address'] = config[section]['address']
+            targets.append(target)
+    #targets = [section.lstrip('TARGET:') for section in config.sections() if section.startswith('TARGET:')]
     try:
         smokeping_config = config['SMOKEPING_SOURCE']['smokeping_config_path']
     except KeyError:
@@ -185,10 +192,11 @@ def get_groups_from_config(config, target_name):
     targets = get_targets_from_config(config)
     for target in targets:
         try:
-            if target == target_name:
-                return [group.strip() for group in config['TARGET:' + target]['groups'].split(',')]
+            if target['name'] == target_name:
+                return [group.strip() for group in config['TARGET:' + target['name']]['groups'].split(',')]
         except KeyError:
-            return None
+            pass
+    return None
 
 
 def get_groups_for_target(target_name, regex):

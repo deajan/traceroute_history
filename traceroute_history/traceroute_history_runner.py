@@ -15,7 +15,7 @@ __author__ = 'Orsiris de Jong'
 __copyright__ = 'Copyright (C) 2020-2022 Orsiris de Jong'
 __licence__ = 'BSD 3 Clause'
 __version__ = '0.5.0-dev'
-__build__ = '2022050501'
+__build__ = '2022050601'
 
 import os
 import sys
@@ -228,12 +228,13 @@ def update_traceroute_database(target: schemas.TargetCreate):
         try:
             # Create groups if not exist
             tgt_groups = []
-            for group in target.groups:
-                grp = crud.get_group(db=db, name=group.name)
-                if not grp:
-                    grp = crud.create_group(db=db, group=group)
-                    logger.info('Created new group "{0}".'.format(group.name))
-                tgt_groups.append(grp)
+            if target.groups:
+                for group in target.groups:
+                    grp = crud.get_group(db=db, name=group.name)
+                    if not grp:
+                        grp = crud.create_group(db=db, group=group)
+                        logger.info('Created new group "{0}".'.format(group.name))
+                    tgt_groups.append(grp)
 
             # Create targets if not exist
             tgt = crud.get_target(db=db, name=target.name)
@@ -331,7 +332,7 @@ def list_targets(include_tr: bool=False, formatting: str='console'):
                 current_tr_object = trparse.loads(current_tr.raw_traceroute)
                 current_rtt = float(current_tr_object.global_rtt)
             # TypeError may happen if the traceroute could not be done, hence global.rtt does not contain an int type str
-            except (trparse.ParseError, TypeError):
+            except (IndexError, trparse.ParseError, TypeError):
                 current_rtt = None
             try:
                 previous_tr = traces[1]
@@ -385,7 +386,6 @@ def delete_old_traceroutes(target_name: str, days: int, keep: int):
             logger.info('Deleted {0} old records for target "{1}".'.format(records, target_name))
 
 
-
 def remove_target(target_name):
     config = config_management.load_config(CONFIG_FILE)
     config_management.remove_target_from_config(config, target_name)
@@ -401,9 +401,9 @@ def execute(daemon=False):
     :return:
     """
     config = config_management.load_config(CONFIG_FILE)
-    target_names = config_management.get_targets_from_config(config)
+    targets = config_management.get_targets_from_config(config)
 
-    if len(target_names) == 0:
+    if len(targets) == 0:
         logger.info('No valid targets given.')
         sys.exit(20)
 
@@ -434,10 +434,16 @@ def execute(daemon=False):
         logger.error('Bogus minimum_keep value. Using default.')
         minimum_keep = 100
 
-    for target_name in target_names:
+    for target in targets:
+        target_name = target['name']
+        target_address = target['address']
         try:
-            grp = [schemas.GroupCreate(name=grp_name) for grp_name in config_management.get_groups_from_config(config, target_name)]
-            tgt = schemas.TargetCreate(name=str(target_name), address=config['TARGET:' + target_name]['address'], groups=grp)
+            group_names = config_management.get_groups_from_config(config, target_name)
+            if group_names:
+                grp = [schemas.GroupCreate(name=grp_name) for grp_name in group_names]
+            else:
+                grp = None
+            tgt = schemas.TargetCreate(name=str(target_name), address=target_address, groups=grp)
 
             job_kwargs = {
                 'target': tgt
@@ -466,6 +472,7 @@ def execute(daemon=False):
 
         except KeyError as exc:
             logger.error('Failed to read configuration for target "{0}": {1}.'.format(target_name, exc))
+            logger.error(exc)
         except ValidationError as exc:
             logger.error('Bogus target "{0}" given: {1}.'.format(target_name, exc))
 
